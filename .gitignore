@@ -8,6 +8,10 @@ dist/
 out/
 *.log
 
+# Generated at build time by `npm run icon`
+build/icon.ico
+build/icon.png
+
 # OS / editor noise
 .DS_Store
 Thumbs.db

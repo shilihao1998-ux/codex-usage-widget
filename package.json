@@ -27,9 +27,58 @@
     "usage": "node bin/codex-usage.js once",
     "verify": "node bin/codex-usage.js verify",
     "serve": "node bin/codex-usage.js serve",
-    "backgrounds": "node tools/make-backgrounds.js"
+    "backgrounds": "node tools/make-backgrounds.js",
+    "icon": "node tools/make-icon.js",
+    "dist": "npm run icon && electron-builder --win"
   },
   "devDependencies": {
-    "electron": "^37.10.3"
+    "electron": "^37.10.3",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.shilihao.codex-usage-widget",
+    "productName": "Codex Usage Widget",
+    "copyright": "Copyright (c) 2026 Shilihao",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "bin/**/*",
+      "plugins/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "assets/backgrounds",
+        "to": "backgrounds"
+      }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Codex Usage Widget",
+      "artifactName": "Codex-Usage-Widget-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "Codex-Usage-Widget-${version}-portable.${ext}"
+    }
   }
 }

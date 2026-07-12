@@ -20,9 +20,21 @@ The numbers are not estimated and not scraped from logs. They come from `account
 - A Codex build whose app-server exposes `account/rateLimits/read` (verified against **codex-cli 0.130 / 0.144**). Older builds without that method will report an error instead of showing numbers.
 - **Windows** is the tested platform (tray, autostart and `start-widget.vbs` are Windows-specific). The binary lookup and the core are written for macOS/Linux too, but they are untested there.
 
-## Install & run
+## Download (Windows)
 
-There is no packaged installer yet — you run it from source, so you need Node and a terminal.
+**[⬇ Get the latest release](https://github.com/shilihao1998-ux/codex-usage-widget/releases/latest)** — no Node, no terminal, no clone.
+
+| File | What it is |
+| --- | --- |
+| `Codex-Usage-Widget-Setup-<version>.exe` | installer — adds a Start-menu and desktop shortcut |
+| `Codex-Usage-Widget-<version>-portable.exe` | portable — just run it, nothing is installed |
+
+Two things to know:
+
+- The binaries are **not code-signed**, so Windows SmartScreen shows a blue "unknown publisher" warning the first time. Click **More info → Run anyway**. (A signing certificate costs real money; this is a free tool.)
+- You still need **Codex installed and signed in** — the widget reads your quota from the local Codex app-server. Without it, the card just says it cannot connect.
+
+## Run from source
 
 ```bash
 git clone https://github.com/shilihao1998-ux/codex-usage-widget.git
@@ -88,7 +100,7 @@ This is a private protocol between Codex's own components — OpenAI can change 
 
 Settings → **Appearance**:
 
-- **Background image** — any local image (png/jpg/gif/webp/bmp/avif, ≤ 12 MB); fit: cover / contain / stretch / tile. Three generated wallpapers ship in `assets/backgrounds/` (`npm run backgrounds` regenerates them).
+- **Background image** — any local image (png/jpg/gif/webp/bmp/avif, ≤ 12 MB); fit: cover / contain / stretch / tile. Three wallpapers ship with the app: in a release build they sit in the app's `resources/backgrounds/` folder, from source in `assets/backgrounds/` (`npm run backgrounds` regenerates them).
 - **Image tint** — colour + strength, laid over the photo so text stays readable
 - Card colour, opacity, backdrop blur, corner radius, width, text scale
 - Colours: text, healthy (> 25 % left), warning (≤ 25 %), critical (≤ 10 %) — gauges, bars and plugin panels all follow
