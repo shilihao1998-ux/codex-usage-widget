@@ -14,6 +14,13 @@
     "tray"
   ],
   "license": "MIT",
+  "author": "Shilihao (https://github.com/shilihao1998-ux)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shilihao1998-ux/codex-usage-widget.git"
+  },
+  "homepage": "https://github.com/shilihao1998-ux/codex-usage-widget#readme",
+  "bugs": "https://github.com/shilihao1998-ux/codex-usage-widget/issues",
   "main": "src/ui/main.js",
   "bin": {
     "codex-usage": "bin/codex-usage.js"
@@ -29,7 +36,7 @@
     "serve": "node bin/codex-usage.js serve",
     "backgrounds": "node tools/make-backgrounds.js",
     "icon": "node tools/make-icon.js",
-    "dist": "npm run icon && electron-builder --win"
+    "dist": "npm run icon && electron-builder --win --publish never"
   },
   "devDependencies": {
     "electron": "^37.10.3",
