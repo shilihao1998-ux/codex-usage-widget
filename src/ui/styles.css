@@ -242,6 +242,31 @@ body {
   text-overflow: ellipsis;
 }
 
+/* An estimate never borrows the ok/warn/crit palette — it stays muted and marked. */
+.estimate {
+  font-size: calc(9px * var(--scale));
+  color: var(--faint);
+  font-style: italic;
+  font-variant-numeric: tabular-nums;
+}
+
+.credits {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: calc(11px * var(--scale));
+}
+
+.credits-label {
+  color: var(--muted);
+}
+
+.credits-value {
+  margin-left: auto;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Plugin panels */
 .panels {
   display: flex;
@@ -252,6 +277,13 @@ body {
 .panels:not(:empty) {
   padding-top: calc(8px * var(--scale));
   border-top: 1px solid var(--hairline);
+}
+
+.panels-label {
+  font-size: calc(9px * var(--scale));
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
 }
 
 .panel-head {

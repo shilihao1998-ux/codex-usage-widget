@@ -24,11 +24,15 @@
         </header>
 
         <main id="rows" class="rows"></main>
-        <section id="panels" class="panels"></section>
 
+        <!-- The provenance line belongs to the quota rows above it. Plugin panels
+             render below it, under their own label, so nothing a plugin returns is
+             ever covered by the words "official app-server data". -->
         <footer class="foot">
           <span id="source">reading account/rateLimits/read…</span>
         </footer>
+
+        <section id="panels" class="panels"></section>
       </div>
     </div>
 
@@ -53,6 +57,13 @@
           <span class="panel-subtitle"></span>
         </div>
         <div class="panel-rows"></div>
+      </div>
+    </template>
+
+    <template id="credits-tpl">
+      <div class="credits">
+        <span class="credits-label">Credits</span>
+        <span class="credits-value"></span>
       </div>
     </template>
 

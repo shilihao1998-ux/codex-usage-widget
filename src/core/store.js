@@ -41,6 +41,9 @@ class Store {
     const row = {
       t: snapshot.fetchedAt,
       plan: snapshot.plan,
+      // `credits` is part of the change fingerprint, so it has to be recorded too
+      // or a credits-only change writes a row that looks identical to the last one.
+      credits: snapshot.credits?.balance ?? null,
       buckets: snapshot.buckets.map((b) => ({
         id: b.id,
         p: b.primary ? { u: b.primary.usedPercent, r: b.primary.resetsAt } : null,
@@ -49,6 +52,14 @@ class Store {
     };
     fs.appendFileSync(this.historyPath, JSON.stringify(row) + '\n');
     this.trimHistory();
+  }
+
+  clearHistory() {
+    try {
+      fs.rmSync(this.historyPath, { force: true });
+    } catch {
+      /* nothing to clear */
+    }
   }
 
   readHistory(limit = 500) {

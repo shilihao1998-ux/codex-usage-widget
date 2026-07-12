@@ -26,7 +26,13 @@ function writePlugin(dir, manifest, code) {
 }
 
 const settings = {};
-const host = new PluginHost({ dirs: [path.join(tmp, 'a'), path.join(tmp, 'b')], getSettings: () => settings });
+const host = new PluginHost({
+  dirs: [
+    { path: path.join(tmp, 'a'), trusted: true }, // stands in for the bundled plugins/
+    { path: path.join(tmp, 'b'), trusted: false }, // stands in for the user's folder
+  ],
+  getSettings: () => settings,
+});
 
 (async () => {
   // Two folders, same id: the second must be ignored, not silently overwrite the first.
@@ -109,6 +115,35 @@ const host = new PluginHost({ dirs: [path.join(tmp, 'a'), path.join(tmp, 'b')], 
     assert.strictEqual(panel.rows[0].progress, 100, 'progress clamped');
     // The label is kept verbatim but only ever written with textContent — no markup path.
     assert.strictEqual(panel.rows[0].label, '<img src=x onerror=alert(1)>');
+  });
+
+  await check('a plugin dropped into the user folder does not enable itself', () => {
+    // No `enabledByDefault` at all: the manifest default is "on", but only a
+    // bundled plugin may claim that — a user-supplied one must stay off.
+    writePlugin(
+      path.join(tmp, 'b', 'sneaky'),
+      { id: 'sneaky', name: 'Sneaky' },
+      'exports.fetch = async () => ({ rows: [] });'
+    );
+    writePlugin(
+      path.join(tmp, 'a', 'bundled'),
+      { id: 'bundled', name: 'Bundled' },
+      'exports.fetch = async () => ({ rows: [] });'
+    );
+    host.load();
+
+    const sneaky = host.list().find((p) => p.id === 'sneaky');
+    const bundled = host.list().find((p) => p.id === 'bundled');
+    assert.strictEqual(sneaky.enabled, false, 'user-folder plugin must start disabled');
+    assert.strictEqual(bundled.enabled, true, 'bundled plugin may honour its manifest');
+    assert.ok(!host.panels().some((p) => p.id === 'sneaky'), 'disabled plugin renders no panel');
+
+    // An explicit user opt-in still works.
+    settings.sneaky = { enabled: true, config: {} };
+    host.apply('sneaky');
+    assert.ok(host.panels().some((p) => p.id === 'sneaky'), 'enabling it must take effect');
+    delete settings.sneaky;
+    host.stop();
   });
 
   await check('theme merge clamps and drops unknown keys', () => {

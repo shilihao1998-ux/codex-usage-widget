@@ -18,7 +18,9 @@ const MIN_REFRESH_MS = 10000;
 class PluginHost extends EventEmitter {
   constructor(opts = {}) {
     super();
-    this.dirs = opts.dirs || [];
+    // Plugins found under a user directory never enable themselves: dropping a
+    // folder in must not be enough to make third-party code run on next launch.
+    this.dirs = (opts.dirs || []).map((d) => (typeof d === 'string' ? { path: d, trusted: false } : d));
     this.getSettings = opts.getSettings || (() => ({}));
     // Electron's net.fetch follows the OS proxy (and PAC) settings; plain fetch
     // does not, which would break every plugin on a proxied machine.
@@ -29,7 +31,7 @@ class PluginHost extends EventEmitter {
 
   discover() {
     const found = [];
-    for (const dir of this.dirs) {
+    for (const { path: dir, trusted } of this.dirs) {
       let entries;
       try {
         entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -38,10 +40,11 @@ class PluginHost extends EventEmitter {
       }
       for (const e of entries) {
         if (!e.isDirectory()) continue;
-        found.push(this._readManifest(path.join(dir, e.name)));
+        const entry = this._readManifest(path.join(dir, e.name));
+        if (entry) found.push({ ...entry, trusted: !!trusted });
       }
     }
-    return found.filter(Boolean);
+    return found;
   }
 
   /** Returns { manifest, dir, error } — a broken folder stays visible with its error. */
@@ -95,8 +98,11 @@ class PluginHost extends EventEmitter {
 
   settingsFor(manifest) {
     const saved = this.getSettings()[manifest.id] || {};
+    // A manifest may ask to be on by default, but only a bundled (trusted) plugin
+    // is granted that; anything the user dropped in starts off until they say so.
+    const byDefault = manifest.trusted ? manifest.enabledByDefault : false;
     return {
-      enabled: saved.enabled ?? manifest.enabledByDefault,
+      enabled: saved.enabled ?? byDefault,
       config: { ...manifest.config, ...(saved.config || {}) },
     };
   }
@@ -115,7 +121,8 @@ class PluginHost extends EventEmitter {
     this.stop();
     this.plugins.clear();
 
-    for (const { manifest, dir, error } of this.discover()) {
+    for (const { manifest: found, dir, error, trusted } of this.discover()) {
+      const manifest = { ...found, trusted };
       if (this.plugins.has(manifest.id)) {
         this.emit('plugin-error', { dir, message: `duplicate plugin id "${manifest.id}" — folder ignored` });
         continue;

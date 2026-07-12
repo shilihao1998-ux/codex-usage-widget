@@ -11,6 +11,7 @@
       <button class="tab active" data-tab="appearance">Appearance</button>
       <button class="tab" data-tab="plugins">Plugins</button>
       <button class="tab" data-tab="behavior">Behavior</button>
+      <button class="tab" data-tab="data">Data</button>
     </nav>
 
     <section class="page active" id="page-appearance">
@@ -22,6 +23,7 @@
           <button id="clearImage" class="ghost">Clear</button>
         </div>
       </div>
+      <div class="wallpapers" id="wallpapers"></div>
       <div class="hint" id="imagePath">no image — solid colour</div>
       <div class="hint error" id="imageError" hidden></div>
 
@@ -104,6 +106,7 @@
     </section>
 
     <section class="page" id="page-behavior">
+      <h2>Card</h2>
       <div class="field checkbox">
         <label><input type="checkbox" id="compact" /> Compact mode</label>
       </div>
@@ -111,8 +114,42 @@
         <label><input type="checkbox" id="showAllBuckets" /> Show all limit buckets (e.g. Spark)</label>
       </div>
       <div class="field checkbox">
+        <label><input type="checkbox" id="showCredits" /> Show credits (only if the account has any)</label>
+      </div>
+      <div class="field checkbox">
+        <label><input type="checkbox" id="showBurnRate" /> Show burn rate &amp; depletion estimate</label>
+      </div>
+      <p class="hint">
+        The burn rate is the only <em>estimated</em> number here — it is computed from this widget's
+        own history, shown muted and tagged <code>est.</code>, and never colours the ring or the tray.
+      </p>
+      <div class="field checkbox">
         <label><input type="checkbox" id="alwaysOnTop" /> Always on top</label>
       </div>
+      <div class="field">
+        <label for="winOpacity">Window opacity <output id="winOpacityOut"></output></label>
+        <input type="range" id="winOpacity" min="0.3" max="1" step="0.05" />
+      </div>
+
+      <h2>Tray</h2>
+      <div class="field">
+        <label for="trayMode">Tray icon</label>
+        <select id="trayMode">
+          <option value="ring">Ring</option>
+          <option value="both">Ring + number</option>
+          <option value="number">Number only</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="trayFollow">Tray shows</label>
+        <select id="trayFollow">
+          <option value="worst">Whichever is lower</option>
+          <option value="primary">5h window</option>
+          <option value="secondary">Weekly window</option>
+        </select>
+      </div>
+
+      <h2>Alerts</h2>
       <div class="field checkbox">
         <label><input type="checkbox" id="notify" /> Low-quota notifications</label>
       </div>
@@ -120,14 +157,68 @@
         <label for="thresholds">Alert thresholds (% left, comma separated)</label>
         <input type="text" id="thresholds" placeholder="20, 10" />
       </div>
+      <div class="field checkbox">
+        <label><input type="checkbox" id="notifyRefill" /> Tell me when the quota comes back</label>
+      </div>
+      <div class="field checkbox">
+        <label><input type="checkbox" id="notifyAllBuckets" /> Also alert for extra buckets (e.g. Spark)</label>
+      </div>
+
+      <h2>Refresh</h2>
       <div class="field">
-        <label for="winOpacity">Window opacity <output id="winOpacityOut"></output></label>
-        <input type="range" id="winOpacity" min="0.3" max="1" step="0.05" />
+        <label for="pollSeconds">Poll interval</label>
+        <select id="pollSeconds">
+          <option value="15">15 seconds</option>
+          <option value="30">30 seconds</option>
+          <option value="60">1 minute</option>
+          <option value="300">5 minutes</option>
+          <option value="900">15 minutes</option>
+        </select>
       </div>
       <p class="hint">
         Quota data comes from <code>account/rateLimits/read</code> on the local Codex app-server —
-        the same call the official Codex app makes. Reading it costs no quota.
+        the same call the official Codex app makes. Reading it costs no quota, and a push from the
+        server refreshes the card immediately whenever a turn consumes quota.
       </p>
+    </section>
+
+    <section class="page" id="page-data">
+      <h2>History</h2>
+      <div class="field checkbox">
+        <label><input type="checkbox" id="recordHistory" /> Record quota history on this machine</label>
+      </div>
+      <p class="hint" id="dataStats"></p>
+      <div class="row">
+        <button id="exportJson">Export JSON</button>
+        <button id="exportCsv">Export CSV</button>
+        <button id="clearHistory" class="ghost">Clear history</button>
+      </div>
+      <p class="hint" id="dataStatus"></p>
+
+      <h2>Files</h2>
+      <p class="hint" id="dataDir"></p>
+      <div class="row">
+        <button id="openDataDir" class="ghost">Open data folder</button>
+      </div>
+      <p class="hint">
+        <code>state.json</code> holds the last snapshot — <strong>including your account email</strong>.
+        <code>history.jsonl</code> records how your quota changed over time. Nothing is ever uploaded.
+      </p>
+
+      <h2>Updates</h2>
+      <div class="field checkbox">
+        <label><input type="checkbox" id="updateCheck" /> Check for new versions (once a day)</label>
+      </div>
+      <p class="hint">
+        This is the app's only outbound request: an unauthenticated GET to the GitHub releases API.
+        It sends no identifiers and installs nothing — it just tells you a new version exists.
+        It matters because this widget reads an undocumented Codex API: if OpenAI changes it, an old
+        build could show wrong numbers.
+      </p>
+      <p class="hint" id="versionInfo"></p>
+      <div class="row">
+        <button id="checkUpdate" class="ghost">Check now</button>
+      </div>
     </section>
 
     <template id="plugin-tpl">

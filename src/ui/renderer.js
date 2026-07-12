@@ -90,7 +90,22 @@ function applyTheme(theme) {
   });
 }
 
-function windowRow(label, win) {
+/**
+ * The one estimated line in the product. It is muted, prefixed with `~`, tagged
+ * `est.`, and never colours the ring or the tray — a guess must not be able to
+ * impersonate a number Codex gave us.
+ */
+function burnLine(burn) {
+  if (!burn) return 'measuring…';
+  const rate = burn.percentPerHour;
+  const at = burn.exhaustAt ? clockAt(burn.exhaustAt) : null;
+  const rateText = `~${rate < 10 ? rate.toFixed(1) : Math.round(rate)}%/h`;
+  if (!at) return `${rateText} · est.`;
+  const beats = burn.exhaustsBeforeReset === true ? 'runs out' : 'lasts past reset';
+  return burn.exhaustsBeforeReset === true ? `${rateText} · ${beats} ~${at} · est.` : `${rateText} · ${beats} · est.`;
+}
+
+function windowRow(label, win, burn) {
   const node = rowTpl.content.firstElementChild.cloneNode(true);
   const remaining = win.remainingPercent;
   const c = color(remaining);
@@ -112,6 +127,13 @@ function windowRow(label, win) {
   reset.textContent = win.resetsAt
     ? `resets in ${duration(Math.max(0, Math.round((win.resetsAt - Date.now()) / 1000)))} · ${clockAt(win.resetsAt)}`
     : 'no reset info';
+
+  if (state.prefs.showBurnRate) {
+    const est = document.createElement('div');
+    est.className = 'estimate';
+    est.textContent = burnLine(burn);
+    node.querySelector('.meta').appendChild(est);
+  }
   return node;
 }
 
@@ -162,8 +184,17 @@ function pluginPanel(panel) {
   return node;
 }
 
+/** Rendered only when the account actually has credits — otherwise zero pixels. */
+function creditsRow(credits) {
+  if (!credits || (!credits.hasCredits && !credits.unlimited)) return null;
+  const node = document.getElementById('credits-tpl').content.firstElementChild.cloneNode(true);
+  // `balance` is an opaque string with no denominator: print it, never a bar or a %.
+  node.querySelector('.credits-value').textContent = credits.unlimited ? 'unlimited' : credits.balance ?? '—';
+  return node;
+}
+
 function render() {
-  const { snapshot, error, prefs, theme, panels } = state;
+  const { snapshot, error, prefs, theme, panels, burn } = state;
   applyTheme(theme);
   document.body.classList.toggle('compact', !!prefs.compact);
 
@@ -173,8 +204,17 @@ function render() {
   if (snapshot) {
     planEl.textContent = snapshot.plan ?? '—';
     const main = snapshot.buckets.find((b) => b.isPrimaryBucket) || snapshot.buckets[0];
-    if (main?.primary) rowsEl.appendChild(windowRow(main.primary.windowLabel || '5h', main.primary));
-    if (main?.secondary) rowsEl.appendChild(windowRow(main.secondary.windowLabel || 'Weekly', main.secondary));
+    if (main?.primary) {
+      rowsEl.appendChild(windowRow(main.primary.windowLabel || '5h', main.primary, burn?.primary));
+    }
+    if (main?.secondary) {
+      rowsEl.appendChild(windowRow(main.secondary.windowLabel || 'Weekly', main.secondary, burn?.secondary));
+    }
+
+    if (prefs.showCredits) {
+      const credits = creditsRow(snapshot.credits);
+      if (credits) rowsEl.appendChild(credits);
+    }
 
     if (prefs.showAllBuckets) {
       for (const b of snapshot.buckets) {
@@ -189,6 +229,14 @@ function render() {
     }
   }
 
+  // Plugin panels sit below the provenance line, under their own label: their rows
+  // are data we did not get from Codex, and the card must never blur that.
+  if ((panels || []).length) {
+    const label = document.createElement('div');
+    label.className = 'panels-label';
+    label.textContent = 'From plugins · not Codex data';
+    panelsEl.appendChild(label);
+  }
   for (const panel of panels || []) panelsEl.appendChild(pluginPanel(panel));
 
   if (!snapshot) {

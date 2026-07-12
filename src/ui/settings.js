@@ -64,15 +64,59 @@ function renderTheme() {
   $('imageError').textContent = t.background.error || '';
 }
 
+const CHECKBOXES = [
+  'compact',
+  'showAllBuckets',
+  'showCredits',
+  'showBurnRate',
+  'alwaysOnTop',
+  'notify',
+  'notifyRefill',
+  'notifyAllBuckets',
+  'recordHistory',
+  'updateCheck',
+];
+
+const SELECTS = ['trayMode', 'trayFollow', 'pollSeconds'];
+
 function renderBehavior() {
   const p = state.prefs;
-  $('compact').checked = !!p.compact;
-  $('showAllBuckets').checked = !!p.showAllBuckets;
-  $('alwaysOnTop').checked = !!p.alwaysOnTop;
-  $('notify').checked = !!p.notify;
+  for (const id of CHECKBOXES) $(id).checked = !!p[id];
+  for (const id of SELECTS) $(id).value = String(p[id]);
   $('thresholds').value = (p.notifyThresholds || []).join(', ');
   $('winOpacity').value = p.opacity ?? 1;
   $('winOpacityOut').textContent = `${Math.round((p.opacity ?? 1) * 100)}%`;
+}
+
+function renderData() {
+  const rows = state.historyRows ?? 0;
+  $('dataStats').textContent = state.prefs.recordHistory
+    ? `${rows} change${rows === 1 ? '' : 's'} recorded so far.`
+    : `Recording is off. ${rows} row${rows === 1 ? '' : 's'} already on disk.`;
+  $('dataDir').textContent = state.dataDir || '';
+  $('versionInfo').textContent = state.update
+    ? `You are on v${state.version} — v${state.update.latest} is available.`
+    : `You are on v${state.version} — up to date as of the last check.`;
+}
+
+/** The wallpapers we ship, as a clickable strip — otherwise they are unreachable. */
+function renderWallpapers() {
+  const strip = $('wallpapers');
+  strip.innerHTML = '';
+  for (const wp of state.builtinBackgrounds || []) {
+    const button = document.createElement('button');
+    button.className = 'wallpaper';
+    button.textContent = wp.name;
+    button.title = wp.path;
+    button.classList.toggle('active', state.theme.background.imagePath === wp.path);
+    button.addEventListener('click', async () => {
+      state = await window.codexSettings.setTheme({
+        background: { ...state.theme.background, imagePath: wp.path },
+      });
+      renderTheme();
+    });
+    strip.appendChild(button);
+  }
 }
 
 /** True while a config editor holds focus or unsaved text — re-rendering would discard it. */
@@ -146,8 +190,12 @@ function isEditing(pageId) {
 }
 
 function render() {
-  if (!isEditing('page-appearance')) renderTheme();
+  if (!isEditing('page-appearance')) {
+    renderTheme();
+    renderWallpapers();
+  }
   if (!isEditing('page-behavior')) renderBehavior();
+  if (!isEditing('page-data')) renderData();
   renderPlugins();
 }
 
@@ -173,11 +221,52 @@ $('reloadPlugins').addEventListener('click', async () => {
 
 $('openPluginDir').addEventListener('click', () => window.codexSettings.openPluginDir());
 
-for (const id of ['compact', 'showAllBuckets', 'alwaysOnTop', 'notify']) {
+for (const id of CHECKBOXES) {
   $(id).addEventListener('change', async () => {
     state = await window.codexSettings.setPrefs({ [id]: $(id).checked });
+    if (id === 'recordHistory') renderData();
   });
 }
+
+for (const id of SELECTS) {
+  $(id).addEventListener('change', async () => {
+    const value = id === 'pollSeconds' ? Number($(id).value) : $(id).value;
+    state = await window.codexSettings.setPrefs({ [id]: value });
+  });
+}
+
+$('openDataDir').addEventListener('click', () => window.codexSettings.openDataDir());
+
+$('clearHistory').addEventListener('click', async () => {
+  state = await window.codexSettings.clearHistory();
+  $('dataStatus').textContent = 'History cleared.';
+  renderData();
+  setTimeout(() => ($('dataStatus').textContent = ''), 2500);
+});
+
+for (const [id, format] of [
+  ['exportJson', 'json'],
+  ['exportCsv', 'csv'],
+]) {
+  $(id).addEventListener('click', async () => {
+    const res = await window.codexSettings.exportHistory(format);
+    $('dataStatus').textContent = res.saved
+      ? `Exported ${res.rows} row${res.rows === 1 ? '' : 's'} to ${res.path}`
+      : res.error
+        ? `Export failed: ${res.error}`
+        : '';
+    setTimeout(() => ($('dataStatus').textContent = ''), 4000);
+  });
+}
+
+$('checkUpdate').addEventListener('click', async () => {
+  $('versionInfo').textContent = 'checking…';
+  const res = await window.codexSettings.checkUpdate();
+  state = await window.codexSettings.get();
+  $('versionInfo').textContent = res.update
+    ? `You are on v${res.version} — v${res.update.latest} is available.`
+    : `You are on v${res.version} — no newer release found.`;
+});
 
 $('winOpacity').addEventListener('input', async () => {
   const value = Number($('winOpacity').value);

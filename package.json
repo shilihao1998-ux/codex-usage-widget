@@ -1,6 +1,6 @@
 {
   "name": "codex-usage-widget",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Desktop widget showing your OpenAI Codex quota (5-hour and weekly windows), read from the same local app-server API the official Codex app uses.",
   "keywords": [
@@ -30,7 +30,7 @@
   },
   "scripts": {
     "start": "electron .",
-    "test": "node test/plugin-host.test.js",
+    "test": "node test/plugin-host.test.js && node test/burn.test.js",
     "usage": "node bin/codex-usage.js once",
     "verify": "node bin/codex-usage.js verify",
     "serve": "node bin/codex-usage.js serve",
@@ -67,11 +67,15 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },

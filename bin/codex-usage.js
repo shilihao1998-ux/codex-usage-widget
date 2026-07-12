@@ -79,8 +79,51 @@ function latestRolloutRateLimits() {
   return null;
 }
 
+const SCHEMA = 'codex-usage.v1';
+
+// Exit codes, so a shell hook can gate work on remaining quota:
+//   0 = fine · 20 = below --warn · 21 = below --crit · 30 = could not read
+const EXIT_OK = 0;
+const EXIT_WARN = 20;
+const EXIT_CRIT = 21;
+const EXIT_UNAVAILABLE = 30;
+
+/**
+ * One line for a shell prompt or status bar.
+ *
+ * Reads the cached snapshot instead of spawning `codex app-server` (that takes
+ * seconds — a prompt would hang), and recomputes the countdown from the absolute
+ * reset timestamp so a cached file never shows a frozen "resets in 2h".
+ */
+function statusline(store) {
+  const snap = store.readState();
+  if (!snap) return { text: 'codex: no data', code: EXIT_UNAVAILABLE };
+
+  const ageSec = Math.round((Date.now() - snap.fetchedAt) / 1000);
+  const left = (win) => (win ? `${win.remainingPercent}%` : '--');
+  const until = (win) =>
+    win?.resetsAt != null ? formatDuration(Math.max(0, Math.round((win.resetsAt - Date.now()) / 1000))) : '--';
+
+  const worst = Math.min(snap.primary?.remainingPercent ?? 100, snap.secondary?.remainingPercent ?? 100);
+  const warn = Number(flag('warn', 20));
+  const crit = Number(flag('crit', 10));
+  const stale = ageSec > 600 ? ' (stale)' : '';
+
+  return {
+    text: `codex ${left(snap.primary)} 5h (${until(snap.primary)}) · ${left(snap.secondary)} wk${stale}`,
+    code: worst <= crit ? EXIT_CRIT : worst <= warn ? EXIT_WARN : EXIT_OK,
+  };
+}
+
 async function main() {
   const svc = new UsageService({ pollMs: Number(flag('interval', 60)) * 1000 });
+
+  if (cmd === 'statusline') {
+    const { text, code } = statusline(svc.store);
+    svc.stop();
+    console.log(text);
+    process.exit(code);
+  }
 
   if (cmd === 'once' || cmd === 'verify') {
     const snap = await svc.refresh();
@@ -110,7 +153,14 @@ async function main() {
       return;
     }
 
-    console.log(has('json') ? JSON.stringify(snap, null, 2) : render(snap));
+    console.log(has('json') ? JSON.stringify({ schema: SCHEMA, ...snap }, null, 2) : render(snap));
+
+    // Same contract as `statusline`, so `once` can gate a script too.
+    const worst = Math.min(snap.primary?.remainingPercent ?? 100, snap.secondary?.remainingPercent ?? 100);
+    const warn = Number(flag('warn', 20));
+    const crit = Number(flag('crit', 10));
+    if (worst <= crit) process.exitCode = EXIT_CRIT;
+    else if (worst <= warn) process.exitCode = EXIT_WARN;
     return;
   }
 
@@ -148,7 +198,7 @@ async function main() {
       const url = new URL(req.url, 'http://127.0.0.1');
       if (url.pathname === '/api/usage') {
         res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify(svc.getState()));
+        res.end(JSON.stringify({ schema: SCHEMA, ...svc.getState() }));
         return;
       }
       if (url.pathname === '/api/history') {
@@ -178,7 +228,20 @@ async function main() {
     return;
   }
 
-  console.log(`usage: codex-usage <once|watch|serve|verify> [--json] [--interval 60] [--port 7893]`);
+  console.log(
+    [
+      'usage: codex-usage <command> [options]',
+      '',
+      'commands:',
+      '  once         print the current quota      [--json] [--warn 20] [--crit 10]',
+      '  statusline   one line for a prompt/status bar (reads the cached snapshot)',
+      '  watch        keep printing on change      [--interval 60]',
+      '  verify       live read vs the snapshot Codex logged itself',
+      '  serve        loopback HTTP + SSE          [--port 7893]',
+      '',
+      'exit codes (once / statusline): 0 ok · 20 below --warn · 21 below --crit · 30 no data',
+    ].join('\n')
+  );
   process.exit(1);
 }
 

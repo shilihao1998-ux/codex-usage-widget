@@ -7,6 +7,7 @@ A plugin renders one extra panel in the widget — weather, disk usage, a stock 
 **The contract: your plugin fetches data and returns structured rows. The widget draws them.** A plugin never returns markup and never touches the renderer, so it cannot break the layout or reach the page — and it inherits the user's theme automatically.
 
 > ⚠️ Plugins run in the **main process with full Node access**: they can read files, spawn processes and make network calls. Install only plugins you trust, exactly as you would with any npm package.
+> A plugin you drop into your own folder **starts disabled** — copying it in is never enough to make it run; you enable it yourself in Settings → Plugins.
 
 ## Where plugins live
 
@@ -26,7 +27,8 @@ One plugin is one folder with two files: `plugin.json` and `index.js`.
   "icon": "🌤",                 // optional, 1–2 characters
   "description": "…",           // shown in the settings window
   "refreshMs": 900000,          // refresh interval; values below 10000 are raised to 10000
-  "enabledByDefault": false,    // optional; OMITTING IT MEANS true — a new plugin starts enabled
+  "enabledByDefault": false,    // only honoured for plugins bundled with the app;
+                                // anything in the user's folder always starts DISABLED
   "config": {                   // default config; the user edits it in the settings window
     "city": "Shanghai"
   }

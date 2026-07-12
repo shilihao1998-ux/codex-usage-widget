@@ -111,7 +111,30 @@ The image is read by the main process and handed to the renderer as a `data:` UR
 
 ### Behavior
 
-Settings → **Behavior**: compact mode, show all limit buckets, always on top, window opacity, low-quota alerts and their thresholds.
+Settings → **Behavior**. Everything here is optional; the remaining-quota rows are the one thing that is always on.
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| Compact mode | off | drops the countdown lines |
+| Show all limit buckets | off | extra metering buckets, e.g. Spark |
+| Show credits | on | renders **nothing** unless the account actually has credits |
+| **Burn rate & depletion estimate** | **off** | see below |
+| Tray icon | ring | ring · ring + number · number only |
+| Tray shows | whichever is lower | or pin it to the 5h or the weekly window |
+| Low-quota alerts + thresholds | on, 20 % / 10 % | one notification per window per threshold |
+| Tell me when the quota comes back | on | fires only for a window that actually warned you |
+| Also alert for extra buckets | off | Spark and friends stay quiet unless asked |
+| Poll interval | 1 min | 15 s … 15 min (a server push still refreshes instantly) |
+
+**Burn rate** is the only estimated number in the product, and it is off by default. When on, each window gains a muted sub-line like `~9.1%/h · runs out ~15:40 · est.` It is computed from this widget's own history, never from Codex, so:
+
+- it refuses to answer until it has ≥3 samples over ≥10 minutes with ≥2 % of movement — until then it says `measuring…` rather than inventing a number;
+- it never fits across a window reset;
+- it never colours the ring, never colours the tray, and never raises a notification.
+
+### Data
+
+Settings → **Data**: stop recording history, clear it, export it (JSON or CSV), open the data folder, and turn the update check on or off.
 
 ## Plugins
 
@@ -130,11 +153,23 @@ Panels below the quota rows — weather, disk, stock prices, server status, what
 
 ```bash
 node bin/codex-usage.js once          # print the current quota
-node bin/codex-usage.js once --json   # ...as JSON
+node bin/codex-usage.js once --json   # ...as JSON (carries "schema": "codex-usage.v1")
+node bin/codex-usage.js statusline    # one line for a prompt or status bar
 node bin/codex-usage.js watch         # keep printing on change
 node bin/codex-usage.js verify        # live read vs. the snapshot Codex logged itself
 node bin/codex-usage.js serve --port 7893
 ```
+
+`statusline` prints `codex 88% 5h (2h 17m) · 78% wk` in ~60 ms — it reads the cached snapshot instead of starting an app-server, so a shell prompt never stalls on it, and it recomputes the countdown from the absolute reset time so a cached file is never shown frozen.
+
+`once` and `statusline` also carry an **exit-code contract**, so a git hook or a script can refuse to start something expensive when you are nearly out:
+
+| Code | Meaning |
+| --- | --- |
+| `0` | fine |
+| `20` | at or below `--warn` (default 20 % left) |
+| `21` | at or below `--crit` (default 10 % left) |
+| `30` | no data (Codex not running / never polled) |
 
 `serve` exposes a loopback HTTP API for status bars and scripts:
 
@@ -148,10 +183,10 @@ It binds to 127.0.0.1, requires a loopback `Host` header and rejects any request
 
 ## Privacy
 
-- No telemetry. Nothing is sent anywhere by the app itself.
-- Local state lives in `~/.codex-usage-widget/` (override with `CODEX_USAGE_DATA_DIR`): `prefs.json`, `state.json` (last snapshot — **includes your account email and plan**), `history.jsonl` (quota changes over time), and your plugins. It is never written into the repo.
+- **No telemetry, ever.** The app makes exactly one request of its own: a daily unauthenticated `GET` to the GitHub releases API to see whether a newer version exists. It sends no identifiers, downloads nothing, and installs nothing — and you can switch it off in Settings → Data. It exists because this widget reads an *undocumented* Codex API: if OpenAI changes it, a frozen install could quietly show wrong numbers.
+- Local state lives in `~/.codex-usage-widget/` (override with `CODEX_USAGE_DATA_DIR`): `prefs.json`, `state.json` (last snapshot — **includes your account email and plan**), `history.jsonl` (quota changes over time), and your plugins. It is never written into the repo. Settings → **Data** lets you stop recording history, clear it, or export it (JSON/CSV).
 - Authentication is entirely Codex's: this project never reads `~/.codex/auth.json` and never handles a token. It asks the local app-server, which is already signed in.
-- Enabled plugins make whatever network calls they make — the bundled weather plugin calls [Open-Meteo](https://open-meteo.com/) (free, no key, CC-BY 4.0 attribution).
+- Enabled plugins make whatever network calls they make — the bundled weather plugin calls [Open-Meteo](https://open-meteo.com/) (free, no key, CC-BY 4.0 attribution). Plugins you drop into your own folder **start disabled**; they run only after you enable them.
 
 ## Layout
 

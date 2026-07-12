@@ -42,10 +42,18 @@ class UsageService extends EventEmitter {
     this.dirty = false;
     this.lastError = null;
 
+    this.recordHistory = opts.recordHistory ?? true;
+
     this.client.on('notification', (method) => {
       if (method === RATE_LIMITS_UPDATED) this._onPush();
     });
-    this.client.on('disconnected', (info) => this.emit('status', { state: 'disconnected', ...info }));
+    this.client.on('disconnected', (info) => {
+      // The account is cached for the life of the connection; if Codex restarted
+      // because the user signed in as someone else, re-read it rather than pin
+      // the old email onto the new numbers.
+      this.account = null;
+      this.emit('status', { state: 'disconnected', ...info });
+    });
     this.client.on('connected', () => this.emit('status', { state: 'connected' }));
     this.client.on('error', (err) => {
       this.lastError = err.message;
@@ -123,7 +131,7 @@ class UsageService extends EventEmitter {
       this.store.writeState(snap);
       if (fp !== this.lastFingerprint) {
         this.lastFingerprint = fp;
-        this.store.appendHistory(snap);
+        if (this.recordHistory) this.store.appendHistory(snap);
       }
     } catch (err) {
       this.emit('service-error', err);
@@ -139,6 +147,26 @@ class UsageService extends EventEmitter {
       lastError: this.lastError,
       pollMs: this.pollMs,
     };
+  }
+
+  /** Change the poll cadence without restarting the app-server connection. */
+  setPollMs(pollMs) {
+    const ms = Math.max(15000, Math.min(3600000, Number(pollMs) || 60000));
+    if (ms === this.pollMs) return this.pollMs;
+    this.pollMs = ms;
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = setInterval(() => {
+        this.refresh().catch(() => {});
+      }, ms);
+    }
+    return ms;
+  }
+
+  /** Wiping history must also clear the fingerprint, or the next poll records nothing. */
+  clearHistory() {
+    this.store.clearHistory();
+    this.lastFingerprint = null;
   }
 
   stop() {

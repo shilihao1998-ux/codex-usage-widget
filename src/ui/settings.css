@@ -202,6 +202,25 @@ code {
   border-radius: 4px;
 }
 
+.wallpapers {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 4px 0 8px;
+}
+
+.wallpaper {
+  padding: 5px 10px;
+  font-size: 12px;
+  text-transform: capitalize;
+  color: var(--muted);
+}
+
+.wallpaper.active {
+  border-color: var(--accent);
+  color: var(--fg);
+}
+
 .plugin {
   border: 1px solid var(--line);
   border-radius: 10px;
