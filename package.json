@@ -1,0 +1,35 @@
+{
+  "name": "codex-usage-widget",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Desktop widget showing your OpenAI Codex quota (5-hour and weekly windows), read from the same local app-server API the official Codex app uses.",
+  "keywords": [
+    "codex",
+    "openai",
+    "quota",
+    "rate-limit",
+    "usage",
+    "desktop-widget",
+    "electron",
+    "tray"
+  ],
+  "license": "MIT",
+  "main": "src/ui/main.js",
+  "bin": {
+    "codex-usage": "bin/codex-usage.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/plugin-host.test.js",
+    "usage": "node bin/codex-usage.js once",
+    "verify": "node bin/codex-usage.js verify",
+    "serve": "node bin/codex-usage.js serve",
+    "backgrounds": "node tools/make-backgrounds.js"
+  },
+  "devDependencies": {
+    "electron": "^37.10.3"
+  }
+}

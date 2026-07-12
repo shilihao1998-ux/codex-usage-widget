@@ -1,0 +1,7 @@
+# Keep the repository LF-only; Windows checkouts still get CRLF locally.
+* text=auto eol=lf
+
+# start-widget.vbs is Windows-only and wscript wants CRLF.
+*.vbs text eol=crlf
+
+*.png binary

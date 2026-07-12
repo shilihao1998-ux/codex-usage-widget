@@ -1,0 +1,15 @@
+# Runtime state — contains the signed-in account's email, plan and usage history.
+# Never commit this.
+data/
+
+# Dependencies and build output
+node_modules/
+dist/
+out/
+*.log
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

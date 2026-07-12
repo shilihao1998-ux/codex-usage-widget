@@ -1,0 +1,246 @@
+:root {
+  --bg: #16171b;
+  --panel: #1d1f24;
+  --fg: #eceef1;
+  --muted: rgba(236, 238, 241, 0.55);
+  --faint: rgba(236, 238, 241, 0.32);
+  --line: rgba(255, 255, 255, 0.09);
+  --accent: #56c88c;
+  --crit: #f46054;
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font);
+  font-size: 13px;
+  padding: 0 16px 24px;
+}
+
+.tabs {
+  position: sticky;
+  top: 0;
+  display: flex;
+  gap: 4px;
+  padding: 12px 0 10px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  z-index: 2;
+}
+
+.tab {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.tab:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--fg);
+}
+
+.tab.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--fg);
+}
+
+.page {
+  display: none;
+  padding-top: 14px;
+}
+
+.page.active {
+  display: block;
+}
+
+h2 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--faint);
+  margin: 14px 0 8px;
+}
+
+h2:first-child {
+  margin-top: 0;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+}
+
+.field label {
+  color: var(--muted);
+  flex: 1;
+  min-width: 0;
+}
+
+.field.checkbox label {
+  color: var(--fg);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+output {
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  margin-left: 6px;
+}
+
+input[type="range"] {
+  width: 190px;
+  accent-color: var(--accent);
+}
+
+/* The native control frames its swatch in light chrome, which reads as a white
+   chip for dark colours — take over the whole box and paint the colour ourselves. */
+input[type="color"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 46px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 5px;
+}
+
+input[type="text"],
+select,
+textarea {
+  background: var(--panel);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 6px 8px;
+  font: inherit;
+  min-width: 190px;
+}
+
+textarea {
+  width: 100%;
+  margin: 8px 0;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+  resize: vertical;
+}
+
+button {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 6px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+button.ghost {
+  background: transparent;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.row.end {
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
+.hint {
+  color: var(--faint);
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 6px 0 10px;
+  word-break: break-all;
+}
+
+.hint.error {
+  color: var(--crit);
+}
+
+code {
+  font-family: "Cascadia Mono", Consolas, monospace;
+  background: rgba(255, 255, 255, 0.07);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.plugin {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  margin-top: 12px;
+  background: var(--panel);
+}
+
+.plugin-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.plugin-name {
+  font-weight: 650;
+  flex: 1;
+}
+
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.plugin-desc {
+  color: var(--muted);
+  margin: 6px 0 4px;
+  line-height: 1.5;
+}
+
+.plugin-config summary {
+  cursor: pointer;
+  color: var(--muted);
+  padding: 4px 0;
+}
+
+.plugin-status {
+  margin: 0;
+}

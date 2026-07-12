@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline' 'self'; script-src 'self'" />
+    <title>Codex Usage</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="card" id="card">
+      <div class="bg" id="bg"></div>
+      <div class="bg-overlay" id="bgOverlay"></div>
+
+      <div class="content">
+        <header class="head">
+          <span class="brand">CODEX</span>
+          <span class="plan" id="plan">—</span>
+          <span class="spacer"></span>
+          <span class="stale" id="stale" title="data age"></span>
+          <button class="icon" id="refresh" title="Refresh now">⟳</button>
+          <button class="icon" id="settings" title="Settings">⚙</button>
+          <button class="icon" id="menu" title="Menu">⋯</button>
+          <button class="icon" id="hide" title="Hide">✕</button>
+        </header>
+
+        <main id="rows" class="rows"></main>
+        <section id="panels" class="panels"></section>
+
+        <footer class="foot">
+          <span id="source">reading account/rateLimits/read…</span>
+        </footer>
+      </div>
+    </div>
+
+    <template id="row-tpl">
+      <div class="row">
+        <div class="gauge">
+          <div class="ring"><span class="ring-val"></span></div>
+        </div>
+        <div class="meta">
+          <div class="line1"><span class="label"></span><span class="left"></span></div>
+          <div class="track"><i class="fill"></i></div>
+          <div class="line2"><span class="reset"></span></div>
+        </div>
+      </div>
+    </template>
+
+    <template id="panel-tpl">
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-icon"></span>
+          <span class="panel-name"></span>
+          <span class="panel-subtitle"></span>
+        </div>
+        <div class="panel-rows"></div>
+      </div>
+    </template>
+
+    <template id="panel-row-tpl">
+      <div class="panel-row">
+        <div class="panel-line">
+          <span class="panel-label"></span>
+          <span class="panel-value"></span>
+        </div>
+        <div class="panel-track"><i class="panel-fill"></i></div>
+        <div class="panel-sub"></div>
+      </div>
+    </template>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>

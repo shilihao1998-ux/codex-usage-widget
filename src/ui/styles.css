@@ -1,0 +1,366 @@
+:root {
+  /* Every value below is overwritten from the saved theme at runtime. */
+  --card-bg: rgba(18, 19, 23, 0.82);
+  --overlay: rgba(0, 0, 0, 0.35);
+  --blur: 18px;
+  --radius: 14px;
+  --scale: 1;
+  --fg: #f2f3f5;
+  --ok: #56c88c;
+  --warn: #f0ad4e;
+  --crit: #f46054;
+
+  --muted: color-mix(in srgb, var(--fg) 52%, transparent);
+  --faint: color-mix(in srgb, var(--fg) 32%, transparent);
+  --track: color-mix(in srgb, var(--fg) 14%, transparent);
+  --hairline: color-mix(in srgb, var(--fg) 12%, transparent);
+  --font: -apple-system, "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  background: transparent;
+  overflow: hidden;
+  font-family: var(--font);
+  color: var(--fg);
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+.card {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius);
+  border: 1px solid var(--hairline);
+  background: var(--card-bg);
+  backdrop-filter: blur(var(--blur)) saturate(140%);
+  -webkit-app-region: drag;
+}
+
+.card.stale-data {
+  border-color: color-mix(in srgb, var(--warn) 55%, transparent);
+}
+
+/* Background image sits under a tint layer so text stays readable on any photo. */
+.bg,
+.bg-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.bg {
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.bg-overlay {
+  background: var(--overlay);
+}
+
+.content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: calc(8px * var(--scale));
+  padding: calc(10px * var(--scale)) calc(12px * var(--scale)) calc(8px * var(--scale));
+}
+
+/* Sizes itself, so a larger text scale grows the header instead of clipping it. */
+.head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: calc(16px * var(--scale));
+}
+
+.brand {
+  font-size: calc(10px * var(--scale));
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.plan {
+  font-size: calc(9px * var(--scale));
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--fg) 10%, transparent);
+  color: var(--muted);
+  white-space: nowrap;
+  flex: none;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.stale {
+  font-size: calc(9px * var(--scale));
+  color: var(--warn);
+  margin-right: 2px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.icon {
+  -webkit-app-region: no-drag;
+  flex: none;
+  width: calc(16px * var(--scale));
+  height: calc(16px * var(--scale));
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font-size: calc(11px * var(--scale));
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.card:hover .icon {
+  opacity: 1;
+}
+
+.icon:hover {
+  background: color-mix(in srgb, var(--fg) 16%, transparent);
+  color: var(--fg);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: calc(10px * var(--scale));
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: calc(10px * var(--scale));
+}
+
+.gauge {
+  flex: none;
+}
+
+.ring {
+  position: relative;
+  width: calc(40px * var(--scale));
+  height: calc(40px * var(--scale));
+  border-radius: 50%;
+  background: conic-gradient(var(--c, var(--ok)) calc(var(--pct, 0) * 1%), var(--track) 0);
+  display: grid;
+  place-items: center;
+}
+
+.ring::after {
+  content: "";
+  position: absolute;
+  inset: calc(4px * var(--scale));
+  border-radius: 50%;
+  background: var(--disc, #15161a);
+}
+
+.ring-val {
+  position: relative;
+  z-index: 1;
+  font-size: calc(11px * var(--scale));
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+
+.meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(4px * var(--scale));
+}
+
+.line1 {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.label {
+  font-size: calc(11px * var(--scale));
+  font-weight: 600;
+}
+
+.left {
+  font-size: calc(10px * var(--scale));
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+}
+
+.track,
+.panel-track {
+  height: calc(4px * var(--scale));
+  border-radius: 3px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.fill,
+.panel-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--c, var(--ok));
+  transition: width 0.5s ease;
+}
+
+.line2,
+.panel-sub {
+  font-size: calc(10px * var(--scale));
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.foot {
+  font-size: calc(9px * var(--scale));
+  color: var(--faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Plugin panels */
+.panels {
+  display: flex;
+  flex-direction: column;
+  gap: calc(8px * var(--scale));
+}
+
+.panels:not(:empty) {
+  padding-top: calc(8px * var(--scale));
+  border-top: 1px solid var(--hairline);
+}
+
+.panel-head {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin-bottom: calc(5px * var(--scale));
+}
+
+.panel-icon {
+  font-size: calc(11px * var(--scale));
+}
+
+.panel-name {
+  font-size: calc(10px * var(--scale));
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.panel-subtitle {
+  font-size: calc(9px * var(--scale));
+  color: var(--faint);
+  margin-left: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.panel-rows {
+  display: flex;
+  flex-direction: column;
+  gap: calc(6px * var(--scale));
+}
+
+.panel-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.panel-label {
+  font-size: calc(11px * var(--scale));
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-value {
+  font-size: calc(12px * var(--scale));
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.panel-track {
+  margin-top: calc(3px * var(--scale));
+}
+
+.panel-row.tone-ok .panel-value {
+  color: var(--ok);
+}
+.panel-row.tone-warn .panel-value {
+  color: var(--warn);
+}
+.panel-row.tone-crit .panel-value {
+  color: var(--crit);
+}
+.panel-row.tone-muted .panel-value {
+  color: var(--muted);
+}
+
+.panel-error {
+  font-size: calc(10px * var(--scale));
+  color: var(--crit);
+}
+
+.panel-loading {
+  font-size: calc(10px * var(--scale));
+  color: var(--faint);
+}
+
+body.compact .ring {
+  width: calc(30px * var(--scale));
+  height: calc(30px * var(--scale));
+}
+
+body.compact .ring-val {
+  font-size: calc(10px * var(--scale));
+}
+
+body.compact .line2,
+body.compact .foot {
+  display: none;
+}
+
+body.compact .rows {
+  gap: calc(6px * var(--scale));
+}
+
+.bucket-title {
+  font-size: calc(9px * var(--scale));
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin-top: 2px;
+}
+
+.error {
+  font-size: calc(10px * var(--scale));
+  color: var(--crit);
+}

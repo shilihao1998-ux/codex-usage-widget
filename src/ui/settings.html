@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline' 'self'; script-src 'self'" />
+    <title>Codex Usage Widget — Settings</title>
+    <link rel="stylesheet" href="settings.css" />
+  </head>
+  <body>
+    <nav class="tabs">
+      <button class="tab active" data-tab="appearance">Appearance</button>
+      <button class="tab" data-tab="plugins">Plugins</button>
+      <button class="tab" data-tab="behavior">Behavior</button>
+    </nav>
+
+    <section class="page active" id="page-appearance">
+      <h2>Background</h2>
+      <div class="field">
+        <label>Image</label>
+        <div class="row">
+          <button id="pickImage">Choose image…</button>
+          <button id="clearImage" class="ghost">Clear</button>
+        </div>
+      </div>
+      <div class="hint" id="imagePath">no image — solid colour</div>
+      <div class="hint error" id="imageError" hidden></div>
+
+      <div class="field">
+        <label for="fit">Fit</label>
+        <select id="fit">
+          <option value="cover">Cover</option>
+          <option value="contain">Contain</option>
+          <option value="stretch">Stretch</option>
+          <option value="tile">Tile</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="bgColor">Card colour</label>
+        <input type="color" id="bgColor" />
+      </div>
+      <div class="field">
+        <label for="bgOpacity">Card opacity <output id="bgOpacityOut"></output></label>
+        <input type="range" id="bgOpacity" min="0" max="1" step="0.01" />
+      </div>
+      <div class="field">
+        <label for="overlayColor">Image tint</label>
+        <input type="color" id="overlayColor" />
+      </div>
+      <div class="field">
+        <label for="overlayStrength">Tint strength <output id="overlayStrengthOut"></output></label>
+        <input type="range" id="overlayStrength" min="0" max="1" step="0.01" />
+      </div>
+      <div class="field">
+        <label for="blur">Backdrop blur <output id="blurOut"></output></label>
+        <input type="range" id="blur" min="0" max="40" step="1" />
+      </div>
+
+      <h2>Colours &amp; size</h2>
+      <div class="field">
+        <label for="text">Text</label>
+        <input type="color" id="text" />
+      </div>
+      <div class="field">
+        <label for="accent">Accent / healthy</label>
+        <input type="color" id="accent" />
+      </div>
+      <div class="field">
+        <label for="warn">Warning (≤25% left)</label>
+        <input type="color" id="warn" />
+      </div>
+      <div class="field">
+        <label for="crit">Critical (≤10% left)</label>
+        <input type="color" id="crit" />
+      </div>
+      <div class="field">
+        <label for="width">Width <output id="widthOut"></output></label>
+        <input type="range" id="width" min="200" max="600" step="2" />
+      </div>
+      <div class="field">
+        <label for="radius">Corner radius <output id="radiusOut"></output></label>
+        <input type="range" id="radius" min="0" max="28" step="1" />
+      </div>
+      <div class="field">
+        <label for="scale">Text scale <output id="scaleOut"></output></label>
+        <input type="range" id="scale" min="0.8" max="1.6" step="0.05" />
+      </div>
+
+      <div class="row end">
+        <button id="resetTheme" class="ghost">Reset to default</button>
+      </div>
+    </section>
+
+    <section class="page" id="page-plugins">
+      <p class="hint">
+        Plugins render extra panels in the widget. Drop a folder with
+        <code>plugin.json</code> + <code>index.js</code> into the plugins folder — see PLUGINS.md.
+      </p>
+      <div class="row">
+        <button id="reloadPlugins">Reload plugins</button>
+        <button id="openPluginDir" class="ghost">Open plugins folder</button>
+      </div>
+      <div id="pluginList"></div>
+    </section>
+
+    <section class="page" id="page-behavior">
+      <div class="field checkbox">
+        <label><input type="checkbox" id="compact" /> Compact mode</label>
+      </div>
+      <div class="field checkbox">
+        <label><input type="checkbox" id="showAllBuckets" /> Show all limit buckets (e.g. Spark)</label>
+      </div>
+      <div class="field checkbox">
+        <label><input type="checkbox" id="alwaysOnTop" /> Always on top</label>
+      </div>
+      <div class="field checkbox">
+        <label><input type="checkbox" id="notify" /> Low-quota notifications</label>
+      </div>
+      <div class="field">
+        <label for="thresholds">Alert thresholds (% left, comma separated)</label>
+        <input type="text" id="thresholds" placeholder="20, 10" />
+      </div>
+      <div class="field">
+        <label for="winOpacity">Window opacity <output id="winOpacityOut"></output></label>
+        <input type="range" id="winOpacity" min="0.3" max="1" step="0.05" />
+      </div>
+      <p class="hint">
+        Quota data comes from <code>account/rateLimits/read</code> on the local Codex app-server —
+        the same call the official Codex app makes. Reading it costs no quota.
+      </p>
+    </section>
+
+    <template id="plugin-tpl">
+      <div class="plugin">
+        <div class="plugin-head">
+          <span class="plugin-icon"></span>
+          <span class="plugin-name"></span>
+          <label class="switch"><input type="checkbox" class="plugin-enabled" /> <span>Enabled</span></label>
+        </div>
+        <div class="plugin-desc"></div>
+        <div class="plugin-error hint error" hidden></div>
+        <details class="plugin-config">
+          <summary>Config</summary>
+          <textarea class="plugin-config-json" spellcheck="false" rows="6"></textarea>
+          <div class="row">
+            <button class="plugin-save">Save config</button>
+            <span class="plugin-status hint"></span>
+          </div>
+        </details>
+      </div>
+    </template>
+
+    <script src="settings.js"></script>
+  </body>
+</html>

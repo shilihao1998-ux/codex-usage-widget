@@ -1,0 +1,14 @@
+{
+  "id": "weather",
+  "name": "Weather",
+  "icon": "🌤",
+  "description": "Current conditions from Open-Meteo (no API key needed). Set a city, or exact latitude/longitude.",
+  "refreshMs": 900000,
+  "enabledByDefault": false,
+  "config": {
+    "city": "Shanghai",
+    "latitude": null,
+    "longitude": null,
+    "units": "metric"
+  }
+}
