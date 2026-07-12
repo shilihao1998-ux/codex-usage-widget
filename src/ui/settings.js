@@ -69,7 +69,11 @@ const CHECKBOXES = [
   'showAllBuckets',
   'showCredits',
   'showBurnRate',
+  'showTokens',
+  'showTrend',
   'alwaysOnTop',
+  'lockPosition',
+  'clickThrough',
   'notify',
   'notifyRefill',
   'notifyAllBuckets',
@@ -77,15 +81,52 @@ const CHECKBOXES = [
   'updateCheck',
 ];
 
-const SELECTS = ['trayMode', 'trayFollow', 'pollSeconds'];
+const SELECTS = ['trayMode', 'trayFollow', 'pollSeconds', 'language'];
 
 function renderBehavior() {
   const p = state.prefs;
+
+  const langs = $('language');
+  if (!langs.options.length) {
+    for (const lang of state.languages || []) {
+      const opt = document.createElement('option');
+      opt.value = lang.id;
+      opt.textContent = lang.name;
+      langs.appendChild(opt);
+    }
+  }
+
   for (const id of CHECKBOXES) $(id).checked = !!p[id];
   for (const id of SELECTS) $(id).value = String(p[id]);
   $('thresholds').value = (p.notifyThresholds || []).join(', ');
   $('winOpacity').value = p.opacity ?? 1;
   $('winOpacityOut').textContent = `${Math.round((p.opacity ?? 1) * 100)}%`;
+
+  // null means "no fading"; the slider shows that as 100 %.
+  const idle = p.idleOpacity ?? 1;
+  $('idleOpacity').value = idle;
+  $('idleOpacityOut').textContent = idle >= 1 ? 'off' : `${Math.round(idle * 100)}%`;
+
+  $('hotkey').value = p.hotkey || '';
+  $('hotkeyError').hidden = !state.hotkeyError;
+  $('hotkeyError').textContent = state.hotkeyError || '';
+}
+
+/** Presets are starting points; they keep the user's background image. */
+function renderPresets() {
+  const box = $('presets');
+  box.innerHTML = '';
+  for (const preset of state.presets || []) {
+    const button = document.createElement('button');
+    button.className = 'wallpaper';
+    button.textContent = preset.name;
+    button.addEventListener('click', async () => {
+      state = await window.codexSettings.applyPreset(preset.id);
+      renderTheme();
+      renderWallpapers();
+    });
+    box.appendChild(button);
+  }
 }
 
 function renderData() {
@@ -193,6 +234,7 @@ function render() {
   if (!isEditing('page-appearance')) {
     renderTheme();
     renderWallpapers();
+    renderPresets();
   }
   if (!isEditing('page-behavior')) renderBehavior();
   if (!isEditing('page-data')) renderData();
@@ -272,6 +314,37 @@ $('winOpacity').addEventListener('input', async () => {
   const value = Number($('winOpacity').value);
   $('winOpacityOut').textContent = `${Math.round(value * 100)}%`;
   state = await window.codexSettings.setPrefs({ opacity: value });
+});
+
+$('idleOpacity').addEventListener('input', async () => {
+  const value = Number($('idleOpacity').value);
+  $('idleOpacityOut').textContent = value >= 1 ? 'off' : `${Math.round(value * 100)}%`;
+  state = await window.codexSettings.setPrefs({ idleOpacity: value >= 1 ? null : value });
+});
+
+$('hotkey').addEventListener('change', async () => {
+  state = await window.codexSettings.setPrefs({ hotkey: $('hotkey').value.trim() });
+  $('hotkeyError').hidden = !state.hotkeyError;
+  $('hotkeyError').textContent = state.hotkeyError || '';
+});
+
+$('exportTheme').addEventListener('click', async () => {
+  const res = await window.codexSettings.exportTheme();
+  $('themeStatus').textContent = res.saved ? `Saved to ${res.path}` : res.error || '';
+  setTimeout(() => ($('themeStatus').textContent = ''), 4000);
+});
+
+$('importTheme').addEventListener('click', async () => {
+  const res = await window.codexSettings.importTheme();
+  if (res.imported) {
+    state = await window.codexSettings.get();
+    renderTheme();
+    renderWallpapers();
+    $('themeStatus').textContent = 'Theme imported.';
+  } else if (res.error) {
+    $('themeStatus').textContent = `Import failed: ${res.error}`;
+  }
+  setTimeout(() => ($('themeStatus').textContent = ''), 4000);
 });
 
 $('thresholds').addEventListener('change', async () => {

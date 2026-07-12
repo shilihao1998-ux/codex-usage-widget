@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('codexUsage', {
   openSettings: () => ipcRenderer.send('ui:settings'),
   hide: () => ipcRenderer.send('ui:hide'),
   resize: (height) => ipcRenderer.send('ui:resize', height),
+  hover: (hovering) => ipcRenderer.send('ui:hover', hovering),
   getBackgroundImage: () => ipcRenderer.invoke('theme:image'),
   onUpdate: (cb) => ipcRenderer.on('usage:update', (_e, payload) => cb(payload)),
 });
@@ -18,6 +19,9 @@ contextBridge.exposeInMainWorld('codexSettings', {
   setPrefs: (patch) => ipcRenderer.invoke('settings:set-prefs', patch),
   pickImage: () => ipcRenderer.invoke('settings:pick-image'),
   resetTheme: () => ipcRenderer.invoke('settings:reset-theme'),
+  applyPreset: (id) => ipcRenderer.invoke('settings:apply-preset', id),
+  exportTheme: () => ipcRenderer.invoke('settings:export-theme'),
+  importTheme: () => ipcRenderer.invoke('settings:import-theme'),
   setPlugin: (payload) => ipcRenderer.invoke('plugins:set', payload),
   reloadPlugins: () => ipcRenderer.invoke('plugins:reload'),
   openPluginDir: () => ipcRenderer.invoke('plugins:open-dir'),

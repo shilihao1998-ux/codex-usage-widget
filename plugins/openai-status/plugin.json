@@ -1,0 +1,11 @@
+{
+  "id": "openai-status",
+  "name": "OpenAI status",
+  "icon": "🛰",
+  "description": "Shows a row only when OpenAI reports an incident. A failing turn is more often an outage than an exhausted quota.",
+  "refreshMs": 300000,
+  "enabledByDefault": false,
+  "config": {
+    "showWhenHealthy": false
+  }
+}

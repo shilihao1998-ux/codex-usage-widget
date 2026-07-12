@@ -2,6 +2,7 @@
 const { EventEmitter } = require('events');
 const { AppServerClient } = require('./app-server-client');
 const { normalizeSnapshot, snapshotFingerprint } = require('./model');
+const { TokenUsage } = require('./token-usage');
 const { Store } = require('./store');
 
 const RATE_LIMITS_READ = 'account/rateLimits/read';
@@ -43,6 +44,9 @@ class UsageService extends EventEmitter {
     this.lastError = null;
 
     this.recordHistory = opts.recordHistory ?? true;
+    // Token usage is a separate, slower-moving official feed (daily buckets).
+    this.tokens = new TokenUsage(this.client);
+    this.tokensTimer = null;
 
     this.client.on('notification', (method) => {
       if (method === RATE_LIMITS_UPDATED) this._onPush();
@@ -149,6 +153,25 @@ class UsageService extends EventEmitter {
     };
   }
 
+  /**
+   * Start following token usage. It only changes once a turn finishes, so a
+   * 10-minute cadence is plenty — and it is only started when someone asks.
+   */
+  async startTokenUsage(everyMs = 600000) {
+    if (this.tokensTimer) return this.tokens.state();
+    const tick = () => this.tokens.refresh().then(() => this.emit('tokens', this.tokens.state())).catch(() => {});
+    await tick();
+    // A build without the method will never grow one: stop asking.
+    if (this.tokens.supported === false) return this.tokens.state();
+    this.tokensTimer = setInterval(tick, everyMs);
+    return this.tokens.state();
+  }
+
+  stopTokenUsage() {
+    if (this.tokensTimer) clearInterval(this.tokensTimer);
+    this.tokensTimer = null;
+  }
+
   /** Change the poll cadence without restarting the app-server connection. */
   setPollMs(pollMs) {
     const ms = Math.max(15000, Math.min(3600000, Number(pollMs) || 60000));
@@ -173,6 +196,7 @@ class UsageService extends EventEmitter {
     if (this.timer) clearInterval(this.timer);
     if (this.pushDebounce) clearTimeout(this.pushDebounce);
     this.timer = null;
+    this.stopTokenUsage();
     this.client.stop();
   }
 }

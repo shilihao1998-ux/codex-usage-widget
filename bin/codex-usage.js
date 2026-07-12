@@ -6,6 +6,9 @@ const path = require('path');
 const os = require('os');
 const { UsageService } = require('../src/core/usage-service');
 const { formatDuration } = require('../src/core/model');
+const { runDoctor, renderDoctor } = require('../src/core/doctor');
+const { buildReport } = require('../src/core/report');
+const { startMcpServer } = require('../src/core/mcp');
 
 const args = process.argv.slice(2);
 const cmd = args.find((a) => !a.startsWith('-')) || 'once';
@@ -125,6 +128,46 @@ async function main() {
     process.exit(code);
   }
 
+  if (cmd === 'mcp') {
+    // stdout belongs to the protocol from here on.
+    startMcpServer(svc);
+    return;
+  }
+
+  if (cmd === 'doctor') {
+    const result = await runDoctor();
+    svc.stop();
+    console.log(has('json') ? JSON.stringify(result, null, 2) : renderDoctor(result));
+    process.exit(result.ok ? EXIT_OK : EXIT_UNAVAILABLE);
+  }
+
+  if (cmd === 'report') {
+    const rows = svc.store.readHistory(Infinity);
+    if (!rows.length) {
+      svc.stop();
+      console.error('no history recorded yet — run the widget (or `watch`) for a while first');
+      process.exit(EXIT_UNAVAILABLE);
+    }
+
+    let tokens = null;
+    try {
+      tokens = await svc.tokens.refresh(); // official daily buckets, if this Codex has them
+    } catch {
+      /* older Codex build: the report simply omits the token section */
+    }
+    svc.stop();
+
+    const html = buildReport({ rows, tokens, plan: rows[rows.length - 1]?.plan ?? null });
+    const out = flag('out', path.join(process.cwd(), 'codex-usage-report.html'));
+    fs.writeFileSync(out, html);
+    console.log(`wrote ${out} (${rows.length} recorded changes${tokens ? ', with official token stats' : ''})`);
+    if (has('open')) {
+      const opener = process.platform === 'win32' ? 'explorer' : process.platform === 'darwin' ? 'open' : 'xdg-open';
+      require('child_process').spawn(opener, [out], { detached: true, stdio: 'ignore' }).unref();
+    }
+    return;
+  }
+
   if (cmd === 'once' || cmd === 'verify') {
     const snap = await svc.refresh();
     svc.stop();
@@ -238,6 +281,9 @@ async function main() {
       '  watch        keep printing on change      [--interval 60]',
       '  verify       live read vs the snapshot Codex logged itself',
       '  serve        loopback HTTP + SSE          [--port 7893]',
+      '  report       shareable HTML report        [--out FILE] [--open]',
+      '  doctor       diagnose the setup           [--json]',
+      '  mcp          MCP server on stdio: lets an agent ask its own quota',
       '',
       'exit codes (once / statusline): 0 ok · 20 below --warn · 21 below --crit · 30 no data',
     ].join('\n')

@@ -15,6 +15,14 @@
     </nav>
 
     <section class="page active" id="page-appearance">
+      <h2>Preset</h2>
+      <div class="presets" id="presets"></div>
+      <div class="row">
+        <button id="exportTheme" class="ghost">Export theme</button>
+        <button id="importTheme" class="ghost">Import theme</button>
+      </div>
+      <p class="hint" id="themeStatus"></p>
+
       <h2>Background</h2>
       <div class="field">
         <label>Image</label>
@@ -106,6 +114,16 @@
     </section>
 
     <section class="page" id="page-behavior">
+      <h2>Language</h2>
+      <div class="field">
+        <label for="language">Interface language</label>
+        <select id="language"></select>
+      </div>
+      <p class="hint">
+        Only the interface is translated. Anything Codex reports (plan names, limit ids) and every
+        machine-facing surface (CLI, HTTP API, history file) stays as-is.
+      </p>
+
       <h2>Card</h2>
       <div class="field checkbox">
         <label><input type="checkbox" id="compact" /> Compact mode</label>
@@ -124,12 +142,35 @@
         own history, shown muted and tagged <code>est.</code>, and never colours the ring or the tray.
       </p>
       <div class="field checkbox">
+        <label><input type="checkbox" id="showTokens" /> Show token usage (official, needs a newer Codex)</label>
+      </div>
+      <div class="field checkbox">
+        <label><input type="checkbox" id="showTrend" /> Show quota trend (from this widget's history)</label>
+      </div>
+
+      <h2>Window</h2>
+      <div class="field checkbox">
         <label><input type="checkbox" id="alwaysOnTop" /> Always on top</label>
+      </div>
+      <div class="field checkbox">
+        <label><input type="checkbox" id="lockPosition" /> Lock position</label>
+      </div>
+      <div class="field checkbox">
+        <label><input type="checkbox" id="clickThrough" /> Click-through (the mouse passes through the card)</label>
       </div>
       <div class="field">
         <label for="winOpacity">Window opacity <output id="winOpacityOut"></output></label>
         <input type="range" id="winOpacity" min="0.3" max="1" step="0.05" />
       </div>
+      <div class="field">
+        <label for="idleOpacity">Fade when the mouse is away <output id="idleOpacityOut"></output></label>
+        <input type="range" id="idleOpacity" min="0.2" max="1" step="0.05" />
+      </div>
+      <div class="field">
+        <label for="hotkey">Global hotkey (show/hide)</label>
+        <input type="text" id="hotkey" placeholder="e.g. Ctrl+Alt+C — empty = off" />
+      </div>
+      <p class="hint error" id="hotkeyError" hidden></p>
 
       <h2>Tray</h2>
       <div class="field">

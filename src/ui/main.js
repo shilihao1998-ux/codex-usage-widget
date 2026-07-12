@@ -10,6 +10,7 @@ const {
   shell,
   dialog,
   net,
+  globalShortcut,
   Notification,
 } = require('electron');
 const path = require('path');
@@ -17,8 +18,9 @@ const fs = require('fs');
 const { UsageService } = require('../core/usage-service');
 const { formatDuration } = require('../core/model');
 const { burnRate } = require('../core/burn');
-const { BackgroundImage, mergeTheme, DEFAULT_THEME } = require('../core/theme');
+const { BackgroundImage, mergeTheme, DEFAULT_THEME, THEME_PRESETS } = require('../core/theme');
 const { PluginHost } = require('../core/plugin-host');
+const { translator, LANGUAGES, STRINGS } = require('../core/i18n');
 const { trayIcon } = require('./png');
 
 const { ensureDataDir } = require('../core/paths');
@@ -56,6 +58,13 @@ const DEFAULT_PREFS = {
   trayFollow: 'worst', // worst | primary | secondary
   recordHistory: true,
   updateCheck: true, // one unauthenticated GET to api.github.com per day
+  language: 'en',
+  showTokens: false, // official token usage (needs a newer Codex build)
+  showTrend: false, // sparkline of our own history
+  lockPosition: false,
+  clickThrough: false, // the card becomes scenery: the mouse passes through it
+  idleOpacity: null, // null = off; otherwise the opacity when the mouse is away
+  hotkey: '', // empty = no global shortcut
   height: 176, // last height the renderer asked for; content decides it
   theme: { ...DEFAULT_THEME },
   plugins: {}, // id -> { enabled, config }
@@ -100,12 +109,43 @@ const PREF_KEYS = [
   'notifyRefill',
   'showBurnRate',
   'showCredits',
+  'showTokens',
+  'showTrend',
   'trayMode',
   'trayFollow',
   'recordHistory',
   'updateCheck',
   'pollSeconds',
+  'language',
+  'lockPosition',
+  'clickThrough',
+  'idleOpacity',
+  'hotkey',
 ];
+
+let hotkeyError = null;
+
+/** The card ignores the mouse entirely — the tray is then the only way back. */
+function applyClickThrough() {
+  win?.setIgnoreMouseEvents(!!prefs.clickThrough, { forward: true });
+}
+
+function applyHotkey() {
+  globalShortcut.unregisterAll();
+  hotkeyError = null;
+  if (!prefs.hotkey) return;
+  try {
+    const ok = globalShortcut.register(prefs.hotkey, () => {
+      if (!win) return;
+      win.isVisible() ? win.hide() : win.show();
+    });
+    // register() returns false when another app already owns the combo: say so
+    // rather than leaving a dead shortcut the user thinks is bound.
+    if (!ok) hotkeyError = `${prefs.hotkey} is already taken by another app`;
+  } catch (err) {
+    hotkeyError = `${prefs.hotkey} is not a valid shortcut`;
+  }
+}
 
 function applyPrefs(patch) {
   for (const key of PREF_KEYS) {
@@ -116,6 +156,12 @@ function applyPrefs(patch) {
     prefs.pollSeconds = Math.round((service?.setPollMs(prefs.pollSeconds * 1000) ?? 60000) / 1000);
   }
   if ('recordHistory' in patch && service) service.recordHistory = !!prefs.recordHistory;
+  if ('clickThrough' in patch) applyClickThrough();
+  if ('hotkey' in patch) applyHotkey();
+  if ('showTokens' in patch) {
+    if (prefs.showTokens) service?.startTokenUsage().then(() => pushToRenderer());
+    else service?.stopTokenUsage();
+  }
 
   savePrefs();
   win?.setOpacity(prefs.opacity);
@@ -240,6 +286,11 @@ function createWindow() {
   win.loadFile(path.join(__dirname, 'index.html'));
 
   win.on('moved', () => {
+    // With the position locked, a stray drag is undone instead of persisted.
+    if (prefs.lockPosition && prefs.x != null && prefs.y != null) {
+      win.setPosition(prefs.x, prefs.y, false);
+      return;
+    }
     const [nx, ny] = win.getPosition();
     prefs.x = nx;
     prefs.y = ny;
@@ -248,6 +299,12 @@ function createWindow() {
   win.on('closed', () => {
     win = null;
   });
+}
+
+/** Fade the card when the mouse is elsewhere, if the user asked for that. */
+function applyHoverOpacity(hovering) {
+  if (!win || prefs.idleOpacity == null) return;
+  win.setOpacity(hovering ? prefs.opacity : prefs.idleOpacity);
 }
 
 /** Width is a user setting; height follows the rendered content (see `ui:resize`). */
@@ -277,58 +334,82 @@ function resetsIn(win) {
   return formatDuration(Math.max(0, Math.round((win.resetsAt - Date.now()) / 1000)));
 }
 
+/** Translator for the current language — the tray, menu and notifications use it. */
+function t(key, vars) {
+  return translator(prefs.language)(key, vars);
+}
+
 function windowLine(label, win) {
-  if (!win) return `${label}: --`;
-  return `${label}: ${win.remainingPercent}% left · resets in ${resetsIn(win)}`;
+  if (!win) return t('tray.unknown', { label });
+  return t('tray.left', { label, n: win.remainingPercent, d: resetsIn(win) });
 }
 
 function buildTrayMenu() {
   const snap = service?.snapshot;
   const stale = snap?.cached || !!service?.lastError;
   return Menu.buildFromTemplate([
-    { label: windowLine('5h', snap?.primary), enabled: false },
-    { label: windowLine('Weekly', snap?.secondary), enabled: false },
+    { label: windowLine(t('window.5h'), snap?.primary), enabled: false },
+    { label: windowLine(t('window.weekly'), snap?.secondary), enabled: false },
     ...(stale
-      ? [{ label: service?.lastError ? `⚠ stale: ${service.lastError}` : '⚠ cached data', enabled: false }]
+      ? [
+          {
+            label: service?.lastError
+              ? t('tray.staleData', { msg: service.lastError })
+              : t('tray.cachedData'),
+            enabled: false,
+          },
+        ]
       : []),
     ...(updateInfo
       ? [
           { type: 'separator' },
           {
-            label: `⬆ Update available: v${updateInfo.latest}`,
+            label: t('tray.update', { v: updateInfo.latest }),
             click: () => shell.openExternal(updateInfo.url),
           },
         ]
       : []),
     { type: 'separator' },
-    { label: 'Settings…', click: () => openSettings() },
-    { label: 'Refresh now', click: () => service?.refresh().catch(() => {}) },
+    { label: t('menu.settings'), click: () => openSettings() },
+    { label: t('menu.refresh'), click: () => service?.refresh().catch(() => {}) },
     {
-      label: 'Compact mode',
+      label: t('menu.compact'),
       type: 'checkbox',
       checked: prefs.compact,
       click: (item) => applyPrefs({ compact: item.checked }),
     },
     {
-      label: 'Show all limit buckets',
+      label: t('menu.allBuckets'),
       type: 'checkbox',
       checked: prefs.showAllBuckets,
       click: (item) => applyPrefs({ showAllBuckets: item.checked }),
     },
     {
-      label: `Low-quota alerts (${prefs.notifyThresholds.join('% / ')}%)`,
+      label: t('menu.alerts', { t: prefs.notifyThresholds.join('% / ') }),
       type: 'checkbox',
       checked: prefs.notify,
       click: (item) => applyPrefs({ notify: item.checked }),
     },
     {
-      label: 'Always on top',
+      label: t('menu.onTop'),
       type: 'checkbox',
       checked: prefs.alwaysOnTop,
       click: (item) => applyPrefs({ alwaysOnTop: item.checked }),
     },
     {
-      label: 'Opacity',
+      label: t('menu.lockPosition'),
+      type: 'checkbox',
+      checked: prefs.lockPosition,
+      click: (item) => applyPrefs({ lockPosition: item.checked }),
+    },
+    {
+      label: t('menu.clickThrough'),
+      type: 'checkbox',
+      checked: prefs.clickThrough,
+      click: (item) => applyPrefs({ clickThrough: item.checked }),
+    },
+    {
+      label: t('menu.opacity'),
       submenu: [1, 0.9, 0.75, 0.6].map((o) => ({
         label: `${Math.round(o * 100)}%`,
         type: 'radio',
@@ -339,16 +420,16 @@ function buildTrayMenu() {
       })),
     },
     {
-      label: 'Start with Windows',
+      label: t('menu.startWithWindows'),
       type: 'checkbox',
       checked: loginItemSettings().openAtLogin,
       click: (item) => setOpenAtLogin(item.checked),
     },
     { type: 'separator' },
-    { label: 'Open usage page', click: () => shell.openExternal('https://chatgpt.com/codex/settings/usage') },
-    { label: 'Show / hide widget', click: () => (win?.isVisible() ? win.hide() : win?.show()) },
-    { label: 'Reset position', click: () => resetPosition() },
-    { label: 'Quit', click: () => app.quit() },
+    { label: t('menu.usagePage'), click: () => shell.openExternal('https://chatgpt.com/codex/settings/usage') },
+    { label: t('menu.showHide'), click: () => (win?.isVisible() ? win.hide() : win?.show()) },
+    { label: t('menu.resetPosition'), click: () => resetPosition() },
+    { label: t('menu.quit'), click: () => app.quit() },
   ]);
 }
 
@@ -370,9 +451,9 @@ function updateTray() {
   tray.setImage(icon);
   tray.setToolTip(
     snap
-      ? `Codex — ${windowLine('5h', snap.primary)}\n${windowLine('Weekly', snap.secondary)}` +
-          (service?.lastError ? `\n⚠ stale: ${service.lastError}` : '')
-      : 'Codex usage — loading…'
+      ? `Codex — ${windowLine(t('window.5h'), snap.primary)}\n${windowLine(t('window.weekly'), snap.secondary)}` +
+          (service?.lastError ? `\n${t('tray.staleData', { msg: service.lastError })}` : '')
+      : t('tray.loading')
   );
   tray.setContextMenu(buildTrayMenu());
 }
@@ -396,14 +477,36 @@ function burnEstimates() {
  * The background image is deliberately absent here: it is fetched once over
  * `theme:image` when its key changes, instead of riding along on every push.
  */
+/** Samples for the sparkline — our own history, not Codex's, and only on request. */
+function trendSeries() {
+  if (!prefs.showTrend || !service?.snapshot) return null;
+  const main = service.snapshot.buckets.find((b) => b.isPrimaryBucket) || service.snapshot.buckets[0];
+  if (!main) return null;
+
+  const rows = service.store.readHistory(500);
+  const series = (key) =>
+    rows
+      .map((row) => {
+        const bucket = (row.buckets || []).find((b) => b.id === main.id);
+        const win = bucket && bucket[key];
+        return win && typeof win.u === 'number' ? { t: row.t, remaining: 100 - win.u } : null;
+      })
+      .filter(Boolean);
+
+  return { primary: series('p'), secondary: series('s') };
+}
+
 function widgetState() {
   return {
     snapshot: service?.snapshot ?? null,
     error: service?.lastError ?? null,
     prefs,
+    strings: STRINGS[prefs.language] || STRINGS.en,
     theme: { ...prefs.theme, background: { ...prefs.theme.background, ...background.descriptor() } },
     panels: plugins?.panels() ?? [],
     burn: burnEstimates(),
+    trend: trendSeries(),
+    tokens: prefs.showTokens ? service?.tokens.state() ?? null : null,
     update: updateInfo,
   };
 }
@@ -439,6 +542,10 @@ function settingsState() {
     plugins: plugins?.list() ?? [],
     pluginDirs: PLUGIN_DIRS.map((d) => d.path),
     builtinBackgrounds: builtinBackgrounds(),
+    presets: THEME_PRESETS.map((p) => ({ id: p.id, name: p.name })),
+    languages: LANGUAGES,
+    hotkeyError,
+    tokens: service?.tokens.state() ?? null,
     dataDir: DATA_DIR,
     historyRows: service?.store.readHistory(100000).length ?? 0,
   };
@@ -500,8 +607,8 @@ function checkThresholds(snap) {
         warnedWindows.delete(key);
         if (prefs.notifyRefill) {
           new Notification({
-            title: `Codex ${label} quota is back`,
-            body: `${win.remainingPercent}% available again`,
+            title: t('notify.back.title', { label }),
+            body: t('notify.back.body', { n: win.remainingPercent }),
           }).show();
         }
       }
@@ -516,8 +623,8 @@ function checkThresholds(snap) {
     if (!isNew) continue;
 
     new Notification({
-      title: `Codex ${label} quota low`,
-      body: `${win.remainingPercent}% left · resets in ${resetsIn(win)}`,
+      title: t('notify.low.title', { label }),
+      body: t('notify.low.body', { n: win.remainingPercent, d: resetsIn(win) }),
     }).show();
   }
 }
@@ -663,6 +770,9 @@ app.whenReady().then(() => {
   startService();
   startPlugins();
   watchDisplays();
+  applyClickThrough();
+  applyHotkey();
+  if (prefs.showTokens) service.startTokenUsage().then(() => pushToRenderer());
 
   checkForUpdate();
   updateTimer = setInterval(checkForUpdate, 24 * 60 * 60 * 1000);
@@ -680,6 +790,7 @@ app.whenReady().then(() => {
   ipcMain.on('ui:hide', () => win?.hide());
   ipcMain.on('ui:settings', () => openSettings());
   ipcMain.on('ui:resize', (_e, height) => applyHeight(height));
+  ipcMain.on('ui:hover', (_e, hovering) => applyHoverOpacity(hovering));
 
   ipcMain.handle('settings:get', () => settingsState());
 
@@ -709,6 +820,45 @@ app.whenReady().then(() => {
   ipcMain.handle('settings:reset-theme', () => {
     setTheme(null);
     return settingsState();
+  });
+
+  ipcMain.handle('settings:apply-preset', (_e, id) => {
+    const preset = THEME_PRESETS.find((p) => p.id === id);
+    if (!preset) return settingsState();
+    // Keep whatever background image the user chose; a preset is colours, not content.
+    setTheme({ ...preset.theme, background: { ...preset.theme.background, imagePath: prefs.theme.background.imagePath } });
+    return settingsState();
+  });
+
+  ipcMain.handle('settings:export-theme', async () => {
+    const res = await dialog.showSaveDialog(settingsWin ?? win, {
+      title: 'Export theme',
+      defaultPath: 'codex-usage-theme.json',
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (res.canceled || !res.filePath) return { saved: false };
+    try {
+      fs.writeFileSync(res.filePath, JSON.stringify(prefs.theme, null, 2));
+      return { saved: true, path: res.filePath };
+    } catch (err) {
+      return { saved: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('settings:import-theme', async () => {
+    const res = await dialog.showOpenDialog(settingsWin ?? win, {
+      title: 'Import theme',
+      properties: ['openFile'],
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (res.canceled || !res.filePaths[0]) return { imported: false };
+    try {
+      // mergeTheme clamps and whitelists, so a hand-edited file cannot inject anything.
+      setTheme(JSON.parse(fs.readFileSync(res.filePaths[0], 'utf8')));
+      return { imported: true };
+    } catch (err) {
+      return { imported: false, error: err.message };
+    }
   });
 
   ipcMain.handle('plugins:set', (_e, { id, enabled, config }) => {
@@ -804,6 +954,7 @@ app.on('window-all-closed', () => {});
 app.on('before-quit', () => {
   if (trayTicker) clearInterval(trayTicker);
   if (updateTimer) clearInterval(updateTimer);
+  globalShortcut.unregisterAll();
   service?.stop();
   plugins?.stop();
 });

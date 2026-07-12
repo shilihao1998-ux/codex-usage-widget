@@ -132,4 +132,52 @@ function read(imagePath) {
   }
 }
 
-module.exports = { DEFAULT_THEME, mergeTheme, BackgroundImage };
+/**
+ * Starting points, not skins: each one keeps healthy/warning/critical clearly
+ * distinguishable, because those three colours carry meaning.
+ */
+const THEME_PRESETS = [
+  { id: 'midnight', name: 'Midnight', theme: { ...DEFAULT_THEME } },
+  {
+    id: 'paper',
+    name: 'Paper',
+    theme: {
+      ...DEFAULT_THEME,
+      text: '#1c1d21',
+      accent: '#1f9254',
+      warn: '#b3701a',
+      crit: '#c0392b',
+      background: { ...DEFAULT_THEME.background, color: '#f4f4f6', opacity: 0.9 },
+      overlay: { color: '#ffffff', strength: 0.25 },
+      blur: 12,
+    },
+  },
+  {
+    id: 'terminal',
+    name: 'Terminal',
+    theme: {
+      ...DEFAULT_THEME,
+      text: '#d7f5e2',
+      accent: '#3ddc84',
+      warn: '#e8c547',
+      crit: '#ff5f56',
+      background: { ...DEFAULT_THEME.background, color: '#0b0f0c', opacity: 0.92 },
+      radius: 6,
+      blur: 4,
+    },
+  },
+  {
+    id: 'nord',
+    name: 'Nord',
+    theme: {
+      ...DEFAULT_THEME,
+      text: '#eceff4',
+      accent: '#8fbcbb',
+      warn: '#ebcb8b',
+      crit: '#bf616a',
+      background: { ...DEFAULT_THEME.background, color: '#2e3440', opacity: 0.85 },
+    },
+  },
+];
+
+module.exports = { DEFAULT_THEME, THEME_PRESETS, mergeTheme, BackgroundImage };

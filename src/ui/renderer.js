@@ -2,6 +2,7 @@
 
 const rowsEl = document.getElementById('rows');
 const panelsEl = document.getElementById('panels');
+const extrasEl = document.getElementById('extras');
 const planEl = document.getElementById('plan');
 const sourceEl = document.getElementById('source');
 const staleEl = document.getElementById('stale');
@@ -11,7 +12,13 @@ const rowTpl = document.getElementById('row-tpl');
 const panelTpl = document.getElementById('panel-tpl');
 const panelRowTpl = document.getElementById('panel-row-tpl');
 
-let state = { snapshot: null, error: null, prefs: {}, theme: null, panels: [] };
+let state = { snapshot: null, error: null, prefs: {}, theme: null, panels: [], strings: {} };
+
+/** Chrome is translated; anything the server said is printed verbatim. */
+function tr(key, vars = {}) {
+  const template = state.strings?.[key] ?? key;
+  return template.replace(/\{(\w+)\}/g, (_, name) => (vars[name] != null ? String(vars[name]) : ''));
+}
 
 function color(remaining) {
   if (remaining <= 10) return 'var(--crit)';
@@ -96,13 +103,21 @@ function applyTheme(theme) {
  * impersonate a number Codex gave us.
  */
 function burnLine(burn) {
-  if (!burn) return 'measuring…';
+  if (!burn) return tr('card.measuring');
   const rate = burn.percentPerHour;
-  const at = burn.exhaustAt ? clockAt(burn.exhaustAt) : null;
   const rateText = `~${rate < 10 ? rate.toFixed(1) : Math.round(rate)}%/h`;
-  if (!at) return `${rateText} · est.`;
-  const beats = burn.exhaustsBeforeReset === true ? 'runs out' : 'lasts past reset';
-  return burn.exhaustsBeforeReset === true ? `${rateText} · ${beats} ~${at} · est.` : `${rateText} · ${beats} · est.`;
+  const verdict =
+    burn.exhaustsBeforeReset === true && burn.exhaustAt
+      ? tr('card.runsOut', { t: clockAt(burn.exhaustAt) })
+      : tr('card.lastsPastReset');
+  return `${rateText} · ${verdict} · ${tr('card.est')}`;
+}
+
+/** The two standard windows get translated names; anything else keeps the server's label. */
+function windowLabel(win) {
+  if (win.windowMinutes === 300) return tr('window.5h');
+  if (win.windowMinutes === 10080) return tr('window.weekly');
+  return win.windowLabel || '';
 }
 
 function windowRow(label, win, burn) {
@@ -116,7 +131,7 @@ function windowRow(label, win, burn) {
   node.querySelector('.ring-val').textContent = `${remaining}%`;
 
   node.querySelector('.label').textContent = label;
-  node.querySelector('.left').textContent = `${win.usedPercent}% used`;
+  node.querySelector('.left').textContent = tr('card.used', { n: win.usedPercent });
 
   const fill = node.querySelector('.fill');
   fill.style.width = `${remaining}%`;
@@ -125,8 +140,11 @@ function windowRow(label, win, burn) {
   const reset = node.querySelector('.reset');
   reset.dataset.resetsAt = win.resetsAt ?? '';
   reset.textContent = win.resetsAt
-    ? `resets in ${duration(Math.max(0, Math.round((win.resetsAt - Date.now()) / 1000)))} · ${clockAt(win.resetsAt)}`
-    : 'no reset info';
+    ? tr('card.resetsIn', {
+        d: duration(Math.max(0, Math.round((win.resetsAt - Date.now()) / 1000))),
+        t: clockAt(win.resetsAt),
+      })
+    : tr('card.noReset');
 
   if (state.prefs.showBurnRate) {
     const est = document.createElement('div');
@@ -184,6 +202,138 @@ function pluginPanel(panel) {
   return node;
 }
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function formatTokens(n) {
+  if (n == null) return '--';
+  if (n >= 1e9) return `${(n / 1e9).toFixed(2)}B`;
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
+  if (n >= 1e3) return `${(n / 1e3).toFixed(1)}K`;
+  return String(n);
+}
+
+/**
+ * Official token usage: daily buckets straight from `account/usage/read`.
+ * These are measured numbers, not an estimate, so they may look like the quota
+ * rows — but a Codex build without the method says so rather than showing zeros.
+ */
+function tokensPanel(tokens) {
+  const box = document.createElement('div');
+  box.className = 'extra';
+
+  const head = document.createElement('div');
+  head.className = 'extra-head';
+  head.textContent = tr('usage.title');
+  box.appendChild(head);
+
+  if (tokens.supported === false) {
+    const note = document.createElement('div');
+    note.className = 'extra-note';
+    note.textContent = tr('usage.unsupported');
+    box.appendChild(note);
+    return box;
+  }
+  if (!tokens.days?.length) {
+    const note = document.createElement('div');
+    note.className = 'extra-note';
+    note.textContent = tokens.error || tr('card.measuring');
+    box.appendChild(note);
+    return box;
+  }
+
+  // Daily bars: 14 days, each scaled against the busiest of them.
+  const days = tokens.days.slice(-14);
+  const peak = Math.max(...days.map((d) => d.tokens), 1);
+  const bars = document.createElement('div');
+  bars.className = 'bars';
+  for (const day of days) {
+    const bar = document.createElement('i');
+    bar.style.height = `${Math.max(2, Math.round((day.tokens / peak) * 100))}%`;
+    bar.title = `${day.date}: ${formatTokens(day.tokens)}`;
+    bars.appendChild(bar);
+  }
+  box.appendChild(bars);
+
+  const line = document.createElement('div');
+  line.className = 'extra-line';
+  const today = tokens.today ? `${tr('usage.today')} ${formatTokens(tokens.today.tokens)}` : '';
+  const week = `${tr('usage.last7')} ${formatTokens(tokens.last7Total)}`;
+  const streak = tokens.streakDays ? ` · ${tr('usage.streak', { n: tokens.streakDays })}` : '';
+  line.textContent = `${today} · ${week}${streak}`;
+  box.appendChild(line);
+  return box;
+}
+
+/**
+ * Sparkline of remaining quota over time, from our own history.
+ *
+ * Time is the x-axis (history rows are change-triggered, not evenly spaced), the
+ * line breaks at every window reset, and a gap while the widget was not running
+ * stays a gap — interpolating across it would draw data that never existed.
+ */
+function trendPanel(trend) {
+  const series = trend?.primary || [];
+  const box = document.createElement('div');
+  box.className = 'extra';
+
+  const head = document.createElement('div');
+  head.className = 'extra-head';
+  box.appendChild(head);
+
+  if (series.length < 2) {
+    head.textContent = tr('trend.title');
+    const note = document.createElement('div');
+    note.className = 'extra-note';
+    note.textContent = tr('trend.empty');
+    box.appendChild(note);
+    return box;
+  }
+
+  const W = 240;
+  const H = 34;
+  const PAD = 3;
+  const t0 = series[0].t;
+  const span = Math.max(1, series[series.length - 1].t - t0);
+  const GAP_MS = 30 * 60 * 1000; // no sample for half an hour ⇒ the widget was off
+
+  // Scale y to the range actually covered (with a floor of 10 points), or a barely
+  // moving quota would draw a flat line glued to the top and read as "no data".
+  // The header states the range, so the axis is never silently misleading.
+  const values = series.map((s) => s.remaining);
+  const lo = Math.max(0, Math.min(...values) - 2);
+  const hi = Math.min(100, Math.max(Math.max(...values) + 2, lo + 10));
+  head.textContent = `${tr('trend.title')} · ${Math.round(hi)}% → ${Math.round(values[values.length - 1])}%`;
+
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.classList.add('spark');
+
+  let points = [];
+  const flush = () => {
+    if (points.length > 1) {
+      const line = document.createElementNS(SVG_NS, 'polyline');
+      line.setAttribute('points', points.join(' '));
+      svg.appendChild(line);
+    }
+    points = [];
+  };
+
+  for (let i = 0; i < series.length; i++) {
+    const s = series[i];
+    const prev = series[i - 1];
+    if (prev && (s.t - prev.t > GAP_MS || s.remaining > prev.remaining + 1)) flush(); // gap, or a reset
+    const x = ((s.t - t0) / span) * W;
+    const norm = (Math.max(lo, Math.min(hi, s.remaining)) - lo) / (hi - lo);
+    const y = H - PAD - norm * (H - 2 * PAD);
+    points.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+  }
+  flush();
+
+  box.appendChild(svg);
+  return box;
+}
+
 /** Rendered only when the account actually has credits — otherwise zero pixels. */
 function creditsRow(credits) {
   if (!credits || (!credits.hasCredits && !credits.unlimited)) return null;
@@ -194,21 +344,22 @@ function creditsRow(credits) {
 }
 
 function render() {
-  const { snapshot, error, prefs, theme, panels, burn } = state;
+  const { snapshot, error, prefs, theme, panels, burn, trend, tokens } = state;
   applyTheme(theme);
   document.body.classList.toggle('compact', !!prefs.compact);
 
   rowsEl.innerHTML = '';
   panelsEl.innerHTML = '';
+  extrasEl.innerHTML = '';
 
   if (snapshot) {
     planEl.textContent = snapshot.plan ?? '—';
     const main = snapshot.buckets.find((b) => b.isPrimaryBucket) || snapshot.buckets[0];
     if (main?.primary) {
-      rowsEl.appendChild(windowRow(main.primary.windowLabel || '5h', main.primary, burn?.primary));
+      rowsEl.appendChild(windowRow(windowLabel(main.primary), main.primary, burn?.primary));
     }
     if (main?.secondary) {
-      rowsEl.appendChild(windowRow(main.secondary.windowLabel || 'Weekly', main.secondary, burn?.secondary));
+      rowsEl.appendChild(windowRow(windowLabel(main.secondary), main.secondary, burn?.secondary));
     }
 
     if (prefs.showCredits) {
@@ -223,34 +374,38 @@ function render() {
         title.className = 'bucket-title';
         title.textContent = b.name;
         rowsEl.appendChild(title);
-        if (b.primary) rowsEl.appendChild(windowRow(b.primary.windowLabel || '5h', b.primary));
-        if (b.secondary) rowsEl.appendChild(windowRow(b.secondary.windowLabel || 'Weekly', b.secondary));
+        if (b.primary) rowsEl.appendChild(windowRow(windowLabel(b.primary), b.primary));
+        if (b.secondary) rowsEl.appendChild(windowRow(windowLabel(b.secondary), b.secondary));
       }
     }
   }
+
+  // Official extras (still Codex data, so they stay above the provenance line).
+  if (prefs.showTokens && tokens) extrasEl.appendChild(tokensPanel(tokens));
+  if (prefs.showTrend) extrasEl.appendChild(trendPanel(trend));
 
   // Plugin panels sit below the provenance line, under their own label: their rows
   // are data we did not get from Codex, and the card must never blur that.
   if ((panels || []).length) {
     const label = document.createElement('div');
     label.className = 'panels-label';
-    label.textContent = 'From plugins · not Codex data';
+    label.textContent = tr('card.fromPlugins');
     panelsEl.appendChild(label);
   }
   for (const panel of panels || []) panelsEl.appendChild(pluginPanel(panel));
 
   if (!snapshot) {
     sourceEl.className = error ? 'error' : '';
-    sourceEl.textContent = error ? `error: ${error}` : 'connecting to codex app-server…';
+    sourceEl.textContent = error ? tr('card.error', { msg: error }) : tr('card.connecting');
   } else if (snapshot.rateLimitReachedType) {
     sourceEl.className = 'error';
-    sourceEl.textContent = `limit reached: ${snapshot.rateLimitReachedType}`;
+    sourceEl.textContent = tr('card.limitReached', { type: snapshot.rateLimitReachedType });
   } else if (error) {
     sourceEl.className = 'error';
-    sourceEl.textContent = `stale — ${error}`;
+    sourceEl.textContent = tr('card.staleError', { msg: error });
   } else {
     sourceEl.className = '';
-    sourceEl.textContent = `official app-server data · updated ${clockAt(snapshot.fetchedAt)}`;
+    sourceEl.textContent = tr('card.official', { t: clockAt(snapshot.fetchedAt) });
   }
 
   tick();
@@ -274,7 +429,7 @@ function tick() {
     const at = Number(el.dataset.resetsAt);
     if (!at) continue;
     const sec = Math.max(0, Math.round((at - Date.now()) / 1000));
-    el.textContent = `resets in ${duration(sec)} · ${clockAt(at)}`;
+    el.textContent = tr('card.resetsIn', { d: duration(sec), t: clockAt(at) });
   }
 
   const ageSec = Math.round((Date.now() - snap.fetchedAt) / 1000);
@@ -283,14 +438,22 @@ function tick() {
   // app-server yet in this process — it is not live no matter how recent it is.
   const stale = snap.cached || ageSec > Math.max(pollSec * 3, 300);
   cardEl.classList.toggle('stale-data', stale);
-  staleEl.textContent = stale ? (snap.cached ? 'cached' : `stale ${duration(ageSec)}`) : '';
+  staleEl.textContent = stale
+    ? snap.cached
+      ? tr('card.cached')
+      : tr('card.stale', { d: duration(ageSec) })
+    : '';
 }
 
 document.getElementById('refresh').addEventListener('click', async () => {
-  sourceEl.textContent = 'refreshing…';
+  sourceEl.textContent = tr('card.refreshing');
   state = await window.codexUsage.refresh();
   render();
 });
+
+// Lets main fade the card when the pointer is elsewhere (idle opacity).
+cardEl.addEventListener('mouseenter', () => window.codexUsage.hover(true));
+cardEl.addEventListener('mouseleave', () => window.codexUsage.hover(false));
 document.getElementById('settings').addEventListener('click', () => window.codexUsage.openSettings());
 document.getElementById('menu').addEventListener('click', () => window.codexUsage.openMenu());
 document.getElementById('hide').addEventListener('click', () => window.codexUsage.hide());

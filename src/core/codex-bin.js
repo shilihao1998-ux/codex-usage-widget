@@ -63,12 +63,45 @@ function fromPath() {
   return byExt('.exe') || byExt('.cmd') || byExt('.bat') || null;
 }
 
+/**
+ * The desktop app keeps one versioned build per release in `bin/<hash>/`, and a
+ * launcher in `bin/` that can lag behind it. The newest build is the one the app
+ * itself runs, and older launchers lack newer app-server methods (token usage,
+ * for one), so prefer the freshest versioned binary and keep the launcher as the
+ * fallback.
+ */
+function newestVersionedBin(launcher) {
+  const dir = path.dirname(launcher);
+  const exe = path.basename(launcher);
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory());
+  } catch {
+    return null;
+  }
+
+  const builds = entries
+    .map((e) => path.join(dir, e.name, exe))
+    .filter((p) => fs.existsSync(p))
+    .map((p) => ({ path: p, mtime: fs.statSync(p).mtimeMs }))
+    .sort((a, b) => b.mtime - a.mtime);
+
+  return builds[0]?.path ?? null;
+}
+
 function resolveCodexBin() {
+  if (process.env.CODEX_BIN) {
+    if (fs.existsSync(process.env.CODEX_BIN)) return process.env.CODEX_BIN;
+    throw new Error(`CODEX_BIN does not exist: ${process.env.CODEX_BIN}`);
+  }
+
   for (const p of candidatePaths()) {
-    if (p && fs.existsSync(p)) return p;
+    if (!p || !fs.existsSync(p)) continue;
+    return newestVersionedBin(p) || p;
   }
   const onPath = fromPath();
-  if (onPath && fs.existsSync(onPath)) return onPath;
+  if (onPath && fs.existsSync(onPath)) return newestVersionedBin(onPath) || onPath;
+
   throw new Error(
     'codex executable not found. Set CODEX_BIN to its full path (e.g. ' +
       '%LOCALAPPDATA%\\OpenAI\\Codex\\bin\\codex.exe).'

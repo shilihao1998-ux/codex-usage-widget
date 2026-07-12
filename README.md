@@ -100,7 +100,8 @@ This is a private protocol between Codex's own components — OpenAI can change 
 
 Settings → **Appearance**:
 
-- **Background image** — any local image (png/jpg/gif/webp/bmp/avif, ≤ 12 MB); fit: cover / contain / stretch / tile. Three wallpapers ship with the app: in a release build they sit in the app's `resources/backgrounds/` folder, from source in `assets/backgrounds/` (`npm run backgrounds` regenerates them).
+- **Presets** — Midnight, Paper, Terminal, Nord as starting points; export or import a theme as JSON to share it
+- **Background image** — pick one of the three bundled wallpapers straight from the settings strip, or any local image (png/jpg/gif/webp/bmp/avif, ≤ 12 MB); fit: cover / contain / stretch / tile
 - **Image tint** — colour + strength, laid over the photo so text stays readable
 - Card colour, opacity, backdrop blur, corner radius, width, text scale
 - Colours: text, healthy (> 25 % left), warning (≤ 25 %), critical (≤ 10 %) — gauges, bars and plugin panels all follow
@@ -132,9 +133,26 @@ Settings → **Behavior**. Everything here is optional; the remaining-quota rows
 - it never fits across a window reset;
 - it never colours the ring, never colours the tray, and never raises a notification.
 
+### Token usage & trend (both optional)
+
+![Everything switched on](docs/widget-full.png)
+
+| Panel | Source | Default |
+| --- | --- | --- |
+| **Tokens** | `account/usage/read` — official daily token buckets, streak, lifetime total. **Measured, not estimated.** Needs a recent Codex build; older ones simply hide the panel and say why. | off |
+| **Quota trend** | this widget's own history. Time is the x-axis, the line breaks at every reset, and a gap while the widget was not running stays a gap — interpolating across it would draw hours nobody measured. | off |
+
+### Window
+
+Settings → **Behavior** → Window: lock position, click-through (the mouse passes straight through the card), fade when the mouse is away, and a global hotkey to show/hide it. A hotkey another app already owns is reported instead of silently doing nothing.
+
+### Language
+
+Settings → **Behavior** → Language: English or 简体中文. Only the interface is translated — anything Codex reports (plan names, limit ids) and every machine-facing surface (CLI, HTTP API, history file) stays as-is, so scripts never have to care about your locale.
+
 ### Data
 
-Settings → **Data**: stop recording history, clear it, export it (JSON or CSV), open the data folder, and turn the update check on or off.
+Settings → **Data**: stop recording history, clear it, export it (JSON or CSV), open the data folder, and turn the update check on or off. History is capped automatically: rows older than a week are thinned to one an hour, but retention only ever **drops** rows — averaging two samples would invent a percentage the server never reported, and every reset boundary and peak is kept.
 
 ## Plugins
 
@@ -142,7 +160,7 @@ Panels below the quota rows — weather, disk, stock prices, server status, what
 
 **The contract: a plugin fetches data and returns structured rows (label / value / sub / progress / tone). The widget draws them.** Plugins cannot return HTML and cannot reach the renderer, so a third-party plugin can neither break the layout nor touch the page — and it inherits your theme for free.
 
-- Bundled example: `plugins/weather/` (Open-Meteo, no API key; set a city or exact coordinates; disabled by default)
+- Bundled examples (both disabled by default): `plugins/weather/` (Open-Meteo, no API key) and `plugins/openai-status/` (renders a row **only when OpenAI reports an incident** — a failing turn is more often an outage than an exhausted quota)
 - Your own plugins live in `~/.codex-usage-widget/plugins/<id>/` — Settings → **Plugins** → *Open plugins folder*
 - Settings → **Plugins**: enable/disable, edit config JSON, **Reload plugins**, and see plugin errors inline
 - Plugin HTTP goes through Electron's `net.fetch`, so it **follows the system proxy**
@@ -157,8 +175,15 @@ node bin/codex-usage.js once --json   # ...as JSON (carries "schema": "codex-usa
 node bin/codex-usage.js statusline    # one line for a prompt or status bar
 node bin/codex-usage.js watch         # keep printing on change
 node bin/codex-usage.js verify        # live read vs. the snapshot Codex logged itself
+node bin/codex-usage.js report --open # shareable HTML report (no account identity in it)
+node bin/codex-usage.js doctor        # diagnose the setup; output is redacted, safe to paste
+node bin/codex-usage.js mcp           # MCP server: let an agent check its own quota
 node bin/codex-usage.js serve --port 7893
 ```
+
+**`mcp`** is the one integration nobody else has: point Codex at it and the agent can ask how much quota is left *before* it starts a long refactor. It returns measured values and their age — never a prediction, because a guess handed to a model comes back out of it restated as fact. See [MCP.md](MCP.md).
+
+**`doctor`** turns every line of the troubleshooting section into a two-second check: which codex binary was picked, whether you are signed in, whether both app-server methods answer, and what Codex printed on stderr. Paths are reduced to `~` and the email is masked, so the output can go straight into an issue.
 
 `statusline` prints `codex 88% 5h (2h 17m) · 78% wk` in ~60 ms — it reads the cached snapshot instead of starting an app-server, so a shell prompt never stalls on it, and it recomputes the countdown from the absolute reset time so a cached file is never shown frozen.
 

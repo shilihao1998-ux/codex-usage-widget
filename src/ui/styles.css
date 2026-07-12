@@ -267,6 +267,66 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Official extras: token usage and the quota trend. */
+.extras {
+  display: flex;
+  flex-direction: column;
+  gap: calc(8px * var(--scale));
+}
+
+.extra-head {
+  font-size: calc(9px * var(--scale));
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin-bottom: calc(4px * var(--scale));
+}
+
+.extra-note {
+  font-size: calc(10px * var(--scale));
+  color: var(--muted);
+}
+
+.extra-line {
+  font-size: calc(10px * var(--scale));
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  margin-top: calc(4px * var(--scale));
+}
+
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: calc(28px * var(--scale));
+}
+
+.bars i {
+  flex: 1;
+  min-width: 2px;
+  border-radius: 2px 2px 0 0;
+  background: color-mix(in srgb, var(--ok) 70%, transparent);
+}
+
+.bars i:last-child {
+  background: var(--ok);
+}
+
+.spark {
+  display: block;
+  width: 100%;
+  height: calc(34px * var(--scale));
+}
+
+.spark polyline {
+  fill: none;
+  stroke: var(--ok);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
 /* Plugin panels */
 .panels {
   display: flex;
